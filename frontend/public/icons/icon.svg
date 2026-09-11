@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a9b90"/>
+      <stop offset="100%" stop-color="#2e7d74"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <text x="256" y="330" font-family="'Pretendard','Malgun Gothic',sans-serif" font-size="230" font-weight="800" fill="#ffffff" text-anchor="middle">디</text>
+</svg>
