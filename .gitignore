@@ -1,17 +1,24 @@
+# 실제 환경설정과 비밀값
 .env
 .env.*
 !.env.example
 
+# DB와 업로드 자료
 *.db
 data/
 uploads/
 
+# Python
 .venv/
 venv/
 __pycache__/
+*.pyc
 .pytest_cache/
 
+# Node
 node_modules/
 dist/
 
+# 기타
 *.log
+.DS_Store
