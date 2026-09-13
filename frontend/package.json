@@ -10,13 +10,13 @@
     },
     "dependencies": {
         "@vitejs/plugin-react": "latest",
-        "vite": "latest",
-        "typescript": "latest",
         "react": "latest",
-        "react-dom": "latest"
+        "react-dom": "latest",
+        "vite": "latest"
     },
     "devDependencies": {
         "@types/react": "latest",
-        "@types/react-dom": "latest"
+        "@types/react-dom": "latest",
+        "typescript": "^7.0.2"
     }
 }
