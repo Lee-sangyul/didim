@@ -1,24 +1,23 @@
 import json
-import os
 import sys
 import uuid
-from collections.abc import Generator
-from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from sqlmodel import Session, SQLModel, create_engine, select
 
 from .demo import DemoAssessment, assess, demo_reply
 from .models import Assessment, Attachment, Case, Message, now_iso
 from .privacy import mask_pii
 from .risk import assess_with_claude, bucket, split_countermeasures
+
+from sqlmodel import Session, SQLModel, select
+from .config import settings
+from .database import engine, get_session
 
 if getattr(sys, "frozen", False):
     ROOT = Path(sys.executable).resolve().parent
