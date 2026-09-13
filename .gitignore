@@ -1,0 +1,13 @@
+.claude
+.env
+.venv/
+__pycache__/
+*.pyc
+*.db
+node_modules/
+dist/
+Answer_Example.txt
+interview_questions.txt
+TODO.md
+data/
+backend/.pytest_cache/
