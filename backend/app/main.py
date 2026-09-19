@@ -1,7 +1,9 @@
 import json
 import sys
 import uuid
+from pathlib import Path
 from typing import Optional
+from pathlib import Path
 
 from anthropic import Anthropic
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -16,30 +18,30 @@ from .privacy import mask_pii
 from .risk import assess_with_claude, bucket, split_countermeasures
 
 from sqlmodel import Session, SQLModel, select
-from .config import settings
+
+from .config import ROOT, settings
 from .database import engine, get_session
 
 if getattr(sys, "frozen", False):
-    ROOT = Path(sys.executable).resolve().parent
+    app_root = Path(sys.executable).resolve().parent
 else:
-    ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT / ".env")
-FRONTEND_DIST = ROOT / "frontend" / "dist"
-db_url = os.getenv("DATABASE_URL", "sqlite:///./data/didim.db")
-if db_url.startswith("sqlite"):
-    (ROOT / "data").mkdir(exist_ok=True)
-    if db_url == "sqlite:///./data/didim.db":
-        db_url = f"sqlite:///{ROOT / 'data' / 'didim.db'}"
-engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    app_root = ROOT
 
-UPLOAD_DIR = ROOT / "data" / "uploads"
+FRONTEND_DIST = app_root / "frontend" / "dist"
+UPLOAD_DIR = settings.upload_dir
 
 app = FastAPI(title="디딤 API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.frontend_origins),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SYSTEM = """당신은 교권 침해 상담 도우미 '디딤'입니다. 한국어로 차분하고 지지적으로 답하세요. 법률 자문이나 확정 판단을 하지 마세요. 제공되지 않은 법령 조항을 지어내지 마세요. 개인정보 최소화, 증거 원본 보존, 관리자 보고, 교원단체·법률 전문가 검토 같은 절차를 안내하세요. 학생에게 해가 되는 조언, 은폐, 보복, 불법행위를 돕지 마세요. 즉각적인 신체 위험이 있으면 안전 확보와 긴급기관 연락을 먼저 권고하세요."""
 
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_UPLOAD_BYTES = settings.max_upload_bytes
 
 
 class CreateCase(BaseModel):
@@ -132,26 +134,38 @@ def assessment_public(item: Assessment) -> AssessmentPublic:
         created_at=item.created_at,
     )
 
-
-def get_session() -> Generator[Session, None, None]:
-    with Session(engine) as session:
-        yield session
-
-
 @app.on_event("startup")
 def startup() -> None:
     SQLModel.metadata.create_all(engine)
-    with engine.connect() as conn:
-        cols = {row[1] for row in conn.exec_driver_sql('PRAGMA table_info("case")').fetchall()}
-        if "based_law" not in cols:
-            conn.exec_driver_sql("ALTER TABLE \"case\" ADD COLUMN based_law VARCHAR DEFAULT '[]'")
-            conn.commit()
+
+    if settings.is_sqlite:
+        with engine.connect() as conn:
+            cols = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    'PRAGMA table_info("case")'
+                ).fetchall()
+            }
+
+            if "based_law" not in cols:
+                conn.exec_driver_sql(
+                    'ALTER TABLE "case" '
+                    "ADD COLUMN based_law VARCHAR DEFAULT '[]'"
+                )
+                conn.commit()
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "mode": "demo" if os.getenv("DEMO_MODE", "true").lower() == "true" or not os.getenv("ANTHROPIC_API_KEY") else "claude"}
+    demo = settings.demo_mode or not settings.anthropic_api_key
+
+    return {
+        "ok": True,
+        "mode": "demo" if demo else "claude",
+        "environment": settings.app_env,
+    }
 
 
 @app.get("/api/cases", response_model=list[CasePublic])
@@ -251,8 +265,8 @@ def chat(case_id: int, body: ChatInput, session: Session = Depends(get_session))
     if case.title == "새 상담": case.title = masked[:28] + ("…" if len(masked) > 28 else "")
     session.add(case); session.commit()
     prior = list(session.exec(select(Message).where(Message.case_id == case_id).order_by(Message.id)))
-    demo = os.getenv("DEMO_MODE", "true").lower() == "true" or not os.getenv("ANTHROPIC_API_KEY")
-    model_name = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
+    demo = settings.demo_mode or not settings.anthropic_api_key
+    model_name = settings.anthropic_model
 
     def events():
         chunks: list[str] = []
@@ -265,7 +279,7 @@ def chat(case_id: int, body: ChatInput, session: Session = Depends(get_session))
                     token = part + " "; chunks.append(token)
                     yield f"data: {json.dumps({'type':'delta','text':token}, ensure_ascii=False)}\n\n"
             else:
-                client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+                client = Anthropic(api_key=settings.anthropic_api_key)
                 history = [{"role": m.role, "content": mask_pii(m.content)} for m in prior[-12:]]
                 with client.messages.stream(model=model_name, max_tokens=1400, system=SYSTEM, messages=history) as stream:
                     for text in stream.text_stream:
