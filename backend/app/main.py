@@ -21,6 +21,7 @@ from sqlmodel import Session, SQLModel, select
 from .config import ROOT, settings
 from .database import engine, get_session
 from .routers import auth_router
+from .routers.auth import CurrentUserDependency
 
 if getattr(sys, "frozen", False):
     app_root = Path(sys.executable).resolve().parent
@@ -135,6 +136,34 @@ def assessment_public(item: Assessment) -> AssessmentPublic:
         created_at=item.created_at,
     )
 
+def get_owned_case(
+    case_id: int,
+    session: Session,
+    current_user: CurrentUserDependency,
+) -> Case:
+    """
+    현재 로그인 사용자가 소유한 상담을 반환한다.
+
+    다른 사용자의 상담도 존재 여부를 숨기기 위해
+    소유자가 다르면 403이 아니라 404를 반환한다.
+    """
+    case = session.get(
+        Case,
+        case_id,
+    )
+
+    if (
+        case is None
+        or current_user.id is None
+        or case.owner_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="상담을 찾을 수 없습니다.",
+        )
+
+    return case
+
 @app.on_event("startup")
 def startup() -> None:
     if settings.is_sqlite:
@@ -171,161 +200,678 @@ def health() -> dict:
     }
 
 
-@app.get("/api/cases", response_model=list[CasePublic])
-def list_cases(session: Session = Depends(get_session)) -> list[CasePublic]:
-    return [case_public(item) for item in session.exec(select(Case).order_by(Case.updated_at.desc()))]
+@app.get(
+    "/api/cases",
+    response_model=list[CasePublic],
+)
+def list_cases(
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> list[CasePublic]:
+    """
+    현재 로그인한 사용자가 소유한 상담만 반환한다.
+    """
+    if current_user.id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요합니다.",
+        )
+
+    cases = session.exec(
+        select(Case)
+        .where(
+            Case.owner_id == current_user.id
+        )
+        .order_by(
+            Case.updated_at.desc()
+        )
+    )
+
+    return [
+        case_public(item)
+        for item in cases
+    ]
 
 
-@app.post("/api/cases", response_model=CasePublic)
-def create_case(body: CreateCase, session: Session = Depends(get_session)) -> CasePublic:
-    case = Case(title=body.title.strip() or "새 상담")
-    session.add(case); session.commit(); session.refresh(case)
-    greeting = Message(case_id=case.id or 0, role="assistant", content="안녕하세요. 겪고 계신 상황을 시간 순서대로 적어 주세요. 실명·전화번호 등 개인정보는 입력하지 않는 것이 좋습니다.")
-    session.add(greeting); session.commit()
+@app.post(
+    "/api/cases",
+    response_model=CasePublic,
+)
+def create_case(
+    body: CreateCase,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> CasePublic:
+    """
+    현재 로그인 사용자의 소유로 새 상담을 생성한다.
+    """
+    if current_user.id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요합니다.",
+        )
+
+    case = Case(
+        owner_id=current_user.id,
+        title=body.title.strip() or "새 상담",
+    )
+
+    session.add(case)
+    session.commit()
+    session.refresh(case)
+
+    greeting = Message(
+        case_id=case.id or 0,
+        role="assistant",
+        content=(
+            "안녕하세요. 겪고 계신 상황을 시간 순서대로 "
+            "적어 주세요. 실명·전화번호 등 개인정보는 "
+            "입력하지 않는 것이 좋습니다."
+        ),
+    )
+
+    session.add(greeting)
+    session.commit()
+
     return case_public(case)
 
 
-@app.get("/api/cases/{case_id}/messages", response_model=list[MessagePublic])
-def messages(case_id: int, session: Session = Depends(get_session)) -> list[MessagePublic]:
-    return [MessagePublic.model_validate(item) for item in session.exec(select(Message).where(Message.case_id == case_id).order_by(Message.id))]
+@app.get(
+    "/api/cases/{case_id}/messages",
+    response_model=list[MessagePublic],
+)
+def messages(
+    case_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> list[MessagePublic]:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    items = session.exec(
+        select(Message)
+        .where(
+            Message.case_id == case_id
+        )
+        .order_by(Message.id)
+    )
+
+    return [
+        MessagePublic.model_validate(item)
+        for item in items
+    ]
+
+@app.get(
+    "/api/cases/{case_id}/assessments",
+    response_model=list[AssessmentPublic],
+)
+def assessments(
+    case_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> list[AssessmentPublic]:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    items = session.exec(
+        select(Assessment)
+        .where(
+            Assessment.case_id == case_id
+        )
+        .order_by(Assessment.id)
+    )
+
+    return [
+        assessment_public(item)
+        for item in items
+    ]
 
 
-@app.get("/api/cases/{case_id}/assessments", response_model=list[AssessmentPublic])
-def assessments(case_id: int, session: Session = Depends(get_session)) -> list[AssessmentPublic]:
-    return [assessment_public(item) for item in session.exec(select(Assessment).where(Assessment.case_id == case_id).order_by(Assessment.id))]
+@app.delete(
+    "/api/cases/{case_id}",
+    status_code=204,
+)
+def delete_case(
+    case_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> None:
+    case = get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
 
+    assessments_to_delete = session.exec(
+        select(Assessment).where(
+            Assessment.case_id == case_id
+        )
+    )
 
-@app.delete("/api/cases/{case_id}", status_code=204)
-def delete_case(case_id: int, session: Session = Depends(get_session)) -> None:
-    case = session.get(Case, case_id)
-    if not case: raise HTTPException(404, "상담을 찾을 수 없습니다.")
-    for msg in session.exec(select(Message).where(Message.case_id == case_id)):
-        session.delete(msg)
-    for item in session.exec(select(Assessment).where(Assessment.case_id == case_id)):
+    for item in assessments_to_delete:
         session.delete(item)
-    for att in session.exec(select(Attachment).where(Attachment.case_id == case_id)):
-        path = UPLOAD_DIR / str(case_id) / att.stored_name
-        path.unlink(missing_ok=True)
-        session.delete(att)
-    session.delete(case); session.commit()
 
+    attachments_to_delete = session.exec(
+        select(Attachment).where(
+            Attachment.case_id == case_id
+        )
+    )
 
-@app.post("/api/cases/{case_id}/attachments", response_model=AttachmentPublic)
-async def upload_attachment(case_id: int, file: UploadFile = File(...), session: Session = Depends(get_session)) -> AttachmentPublic:
-    case = session.get(Case, case_id)
-    if not case: raise HTTPException(404, "상담을 찾을 수 없습니다.")
-    original_name = Path(file.filename or "attachment").name
-    stored_name = f"{uuid.uuid4().hex}_{original_name}"
-    case_dir = UPLOAD_DIR / str(case_id)
-    case_dir.mkdir(parents=True, exist_ok=True)
-    dest = case_dir / stored_name
+    for attachment in attachments_to_delete:
+        path = (
+            UPLOAD_DIR
+            / str(case_id)
+            / attachment.stored_name
+        )
+
+        path.unlink(
+            missing_ok=True,
+        )
+
+        session.delete(attachment)
+
+    messages_to_delete = session.exec(
+        select(Message).where(
+            Message.case_id == case_id
+        )
+    )
+
+    for message in messages_to_delete:
+        session.delete(message)
+
+    session.delete(case)
+    session.commit()
+
+@app.post(
+    "/api/cases/{case_id}/attachments",
+    response_model=AttachmentPublic,
+)
+async def upload_attachment(
+    case_id: int,
+    current_user: CurrentUserDependency,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+) -> AttachmentPublic:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    original_name = Path(
+        file.filename or "attachment"
+    ).name
+
+    stored_name = (
+        f"{uuid.uuid4().hex}_{original_name}"
+    )
+
+    case_dir = (
+        UPLOAD_DIR
+        / str(case_id)
+    )
+
+    case_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    destination = (
+        case_dir
+        / stored_name
+    )
+
     size = 0
-    with dest.open("wb") as out:
-        while chunk := await file.read(1024 * 1024):
+
+    with destination.open("wb") as output:
+        while chunk := await file.read(
+            1024 * 1024
+        ):
             size += len(chunk)
+
             if size > MAX_UPLOAD_BYTES:
-                out.close()
-                dest.unlink(missing_ok=True)
-                raise HTTPException(413, "파일 크기는 20MB를 초과할 수 없습니다.")
-            out.write(chunk)
-    attachment = Attachment(case_id=case_id, filename=original_name, stored_name=stored_name, content_type=file.content_type or "application/octet-stream", size=size)
-    session.add(attachment); session.commit(); session.refresh(attachment)
-    return AttachmentPublic.model_validate(attachment)
+                output.close()
+
+                destination.unlink(
+                    missing_ok=True,
+                )
+
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        "파일 크기는 설정된 최대 크기를 "
+                        "초과할 수 없습니다."
+                    ),
+                )
+
+            output.write(chunk)
+
+    attachment = Attachment(
+        case_id=case_id,
+        filename=original_name,
+        stored_name=stored_name,
+        content_type=(
+            file.content_type
+            or "application/octet-stream"
+        ),
+        size=size,
+    )
+
+    session.add(attachment)
+    session.commit()
+    session.refresh(attachment)
+
+    return AttachmentPublic.model_validate(
+        attachment
+    )
 
 
-@app.get("/api/cases/{case_id}/attachments", response_model=list[AttachmentPublic])
-def list_attachments(case_id: int, session: Session = Depends(get_session)) -> list[AttachmentPublic]:
-    return [AttachmentPublic.model_validate(item) for item in session.exec(select(Attachment).where(Attachment.case_id == case_id).order_by(Attachment.id))]
+@app.get(
+    "/api/cases/{case_id}/attachments",
+    response_model=list[AttachmentPublic],
+)
+def list_attachments(
+    case_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> list[AttachmentPublic]:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    attachments = session.exec(
+        select(Attachment)
+        .where(
+            Attachment.case_id == case_id
+        )
+        .order_by(Attachment.id)
+    )
+
+    return [
+        AttachmentPublic.model_validate(item)
+        for item in attachments
+    ]
 
 
-@app.get("/api/cases/{case_id}/attachments/{attachment_id}/download")
-def download_attachment(case_id: int, attachment_id: int, session: Session = Depends(get_session)) -> FileResponse:
-    attachment = session.get(Attachment, attachment_id)
-    if not attachment or attachment.case_id != case_id: raise HTTPException(404, "파일을 찾을 수 없습니다.")
-    path = UPLOAD_DIR / str(case_id) / attachment.stored_name
-    if not path.exists(): raise HTTPException(404, "파일을 찾을 수 없습니다.")
-    return FileResponse(path, filename=attachment.filename, media_type=attachment.content_type)
+@app.get(
+    "/api/cases/{case_id}/attachments/{attachment_id}/download"
+)
+def download_attachment(
+    case_id: int,
+    attachment_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> FileResponse:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    attachment = session.get(
+        Attachment,
+        attachment_id,
+    )
+
+    if (
+        attachment is None
+        or attachment.case_id != case_id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="파일을 찾을 수 없습니다.",
+        )
+
+    path = (
+        UPLOAD_DIR
+        / str(case_id)
+        / attachment.stored_name
+    )
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="파일을 찾을 수 없습니다.",
+        )
+
+    return FileResponse(
+        path=path,
+        filename=attachment.filename,
+        media_type=attachment.content_type,
+    )
 
 
-@app.delete("/api/cases/{case_id}/attachments/{attachment_id}", status_code=204)
-def delete_attachment(case_id: int, attachment_id: int, session: Session = Depends(get_session)) -> None:
-    attachment = session.get(Attachment, attachment_id)
-    if not attachment or attachment.case_id != case_id: raise HTTPException(404, "파일을 찾을 수 없습니다.")
-    path = UPLOAD_DIR / str(case_id) / attachment.stored_name
-    path.unlink(missing_ok=True)
-    session.delete(attachment); session.commit()
+@app.delete(
+    "/api/cases/{case_id}/attachments/{attachment_id}",
+    status_code=204,
+)
+def delete_attachment(
+    case_id: int,
+    attachment_id: int,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> None:
+    get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    attachment = session.get(
+        Attachment,
+        attachment_id,
+    )
+
+    if (
+        attachment is None
+        or attachment.case_id != case_id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="파일을 찾을 수 없습니다.",
+        )
+
+    path = (
+        UPLOAD_DIR
+        / str(case_id)
+        / attachment.stored_name
+    )
+
+    path.unlink(
+        missing_ok=True,
+    )
+
+    session.delete(attachment)
+    session.commit()
 
 
-@app.post("/api/cases/{case_id}/chat")
-def chat(case_id: int, body: ChatInput, session: Session = Depends(get_session)) -> StreamingResponse:
-    case = session.get(Case, case_id)
-    if not case: raise HTTPException(404, "상담을 찾을 수 없습니다.")
+@app.post(
+    "/api/cases/{case_id}/chat"
+)
+def chat(
+    case_id: int,
+    body: ChatInput,
+    current_user: CurrentUserDependency,
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    case = get_owned_case(
+        case_id=case_id,
+        session=session,
+        current_user=current_user,
+    )
+
+    owner_id = current_user.id
     original = body.content.strip()
     masked = mask_pii(original)
     demo_assessment = assess(masked)
-    session.add(Message(case_id=case_id, role="user", content=original))
-    case.category, case.risk_level, case.risk_score, case.updated_at = demo_assessment.category, demo_assessment.level, demo_assessment.score, now_iso()
-    if case.title == "새 상담": case.title = masked[:28] + ("…" if len(masked) > 28 else "")
-    session.add(case); session.commit()
-    prior = list(session.exec(select(Message).where(Message.case_id == case_id).order_by(Message.id)))
-    demo = settings.demo_mode or not settings.anthropic_api_key
+
+    user_message = Message(
+        case_id=case_id,
+        role="user",
+        content=original,
+    )
+
+    session.add(user_message)
+
+    case.category = demo_assessment.category
+    case.risk_level = demo_assessment.level
+    case.risk_score = demo_assessment.score
+    case.updated_at = now_iso()
+
+    if case.title == "새 상담":
+        case.title = masked[:28] + (
+            "…"
+            if len(masked) > 28
+            else ""
+        )
+
+    session.add(case)
+    session.commit()
+
+    prior = list(
+        session.exec(
+            select(Message)
+            .where(
+                Message.case_id == case_id
+            )
+            .order_by(Message.id)
+        )
+    )
+
+    demo = (
+        settings.demo_mode
+        or not settings.anthropic_api_key
+    )
+
     model_name = settings.anthropic_model
 
     def events():
         chunks: list[str] = []
         assessment: DemoAssessment = demo_assessment
         based_law: list[str] = []
+
         try:
             if demo:
-                answer = demo_reply(masked, demo_assessment)
+                answer = demo_reply(
+                    masked,
+                    demo_assessment,
+                )
+
                 for part in answer.split(" "):
-                    token = part + " "; chunks.append(token)
-                    yield f"data: {json.dumps({'type':'delta','text':token}, ensure_ascii=False)}\n\n"
+                    token = part + " "
+                    chunks.append(token)
+
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "type": "delta",
+                                "text": token,
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n\n"
+                    )
+
             else:
-                client = Anthropic(api_key=settings.anthropic_api_key)
-                history = [{"role": m.role, "content": mask_pii(m.content)} for m in prior[-12:]]
-                with client.messages.stream(model=model_name, max_tokens=1400, system=SYSTEM, messages=history) as stream:
+                client = Anthropic(
+                    api_key=settings.anthropic_api_key
+                )
+
+                history = [
+                    {
+                        "role": message.role,
+                        "content": mask_pii(
+                            message.content
+                        ),
+                    }
+                    for message in prior[-12:]
+                ]
+
+                with client.messages.stream(
+                    model=model_name,
+                    max_tokens=1400,
+                    system=SYSTEM,
+                    messages=history,
+                ) as stream:
                     for text in stream.text_stream:
                         chunks.append(text)
-                        yield f"data: {json.dumps({'type':'delta','text':text}, ensure_ascii=False)}\n\n"
+
+                        yield (
+                            "data: "
+                            + json.dumps(
+                                {
+                                    "type": "delta",
+                                    "text": text,
+                                },
+                                ensure_ascii=False,
+                            )
+                            + "\n\n"
+                        )
+
                 try:
-                    first_user = next((m.content for m in prior if m.role == "user"), original)
-                    result = assess_with_claude(client, model_name, mask_pii(first_user), masked)
+                    first_user = next(
+                        (
+                            message.content
+                            for message in prior
+                            if message.role == "user"
+                        ),
+                        original,
+                    )
+
+                    result = assess_with_claude(
+                        client,
+                        model_name,
+                        mask_pii(first_user),
+                        masked,
+                    )
+
                     based_law = result["based_law"]
-                    actions = split_countermeasures(result["countermeasures"]) or demo_assessment.actions
-                    assessment = DemoAssessment(bucket(result["risk_level"]), result["risk_level"], demo_assessment.category, result["countermeasures"] or demo_assessment.rationale, actions)
+
+                    actions = (
+                        split_countermeasures(
+                            result["countermeasures"]
+                        )
+                        or demo_assessment.actions
+                    )
+
+                    assessment = DemoAssessment(
+                        bucket(result["risk_level"]),
+                        result["risk_level"],
+                        demo_assessment.category,
+                        (
+                            result["countermeasures"]
+                            or demo_assessment.rationale
+                        ),
+                        actions,
+                    )
+
                 except Exception as exc:
-                    print(f"risk assessment fallback ({case_id}): {exc}")
-            final = "".join(chunks).strip()
+                    print(
+                        "risk assessment fallback "
+                        f"({case_id}): {exc}"
+                    )
+
+            final = "".join(
+                chunks
+            ).strip()
+
             with Session(engine) as save:
-                saved_case = save.get(Case, case_id)
-                saved_case.risk_level, saved_case.risk_score, saved_case.category = assessment.level, assessment.score, assessment.category
-                saved_case.based_law = json.dumps(based_law, ensure_ascii=False)
-                reply_message = Message(case_id=case_id, role="assistant", content=final)
-                save.add(saved_case); save.add(reply_message); save.commit(); save.refresh(reply_message)
-                save.add(Assessment(
+                saved_case = save.get(
+                    Case,
+                    case_id,
+                )
+
+                if (
+                    saved_case is None
+                    or owner_id is None
+                    or saved_case.owner_id != owner_id
+                ):
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "type": "error",
+                                "message": (
+                                    "상담을 찾을 수 없습니다."
+                                ),
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n\n"
+                    )
+
+                    return
+
+                saved_case.risk_level = (
+                    assessment.level
+                )
+                saved_case.risk_score = (
+                    assessment.score
+                )
+                saved_case.category = (
+                    assessment.category
+                )
+                saved_case.based_law = json.dumps(
+                    based_law,
+                    ensure_ascii=False,
+                )
+
+                reply_message = Message(
+                    case_id=case_id,
+                    role="assistant",
+                    content=final,
+                )
+
+                save.add(saved_case)
+                save.add(reply_message)
+                save.commit()
+                save.refresh(reply_message)
+
+                saved_assessment = Assessment(
                     case_id=case_id,
                     message_id=reply_message.id,
                     risk_level=assessment.level,
                     risk_score=assessment.score,
                     category=assessment.category,
                     rationale=assessment.rationale,
-                    based_law=json.dumps(based_law, ensure_ascii=False),
-                    actions=json.dumps(assessment.actions, ensure_ascii=False),
-                ))
+                    based_law=json.dumps(
+                        based_law,
+                        ensure_ascii=False,
+                    ),
+                    actions=json.dumps(
+                        assessment.actions,
+                        ensure_ascii=False,
+                    ),
+                )
+
+                save.add(saved_assessment)
                 save.commit()
-            yield f"data: {json.dumps({'type':'done','assessment':{**assessment.__dict__, 'based_law': based_law}}, ensure_ascii=False)}\n\n"
+
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "type": "done",
+                        "assessment": {
+                            **assessment.__dict__,
+                            "based_law": based_law,
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
+
         except Exception:
-            yield f"data: {json.dumps({'type':'error','message':'AI 응답 중 오류가 발생했습니다. 설정과 API 키를 확인하세요.'}, ensure_ascii=False)}\n\n"
-    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "type": "error",
+                        "message": (
+                            "AI 응답 중 오류가 발생했습니다. "
+                            "설정과 API 키를 확인하세요."
+                        ),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
 
-
-if FRONTEND_DIST.is_dir():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
-
-    @app.get("/{full_path:path}")
-    def spa(full_path: str) -> FileResponse:
-        candidate = FRONTEND_DIST / full_path
-        if full_path and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(FRONTEND_DIST / "index.html")
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
