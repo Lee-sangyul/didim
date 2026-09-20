@@ -9,3 +9,4 @@ httpx==0.28.1
 
 psycopg[binary]
 alembic
+pwdlib[argon2]==0.3.1
