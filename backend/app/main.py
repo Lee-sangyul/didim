@@ -3,7 +3,6 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Optional
-from pathlib import Path
 
 from anthropic import Anthropic
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -21,6 +20,7 @@ from sqlmodel import Session, SQLModel, select
 
 from .config import ROOT, settings
 from .database import engine, get_session
+from .routers import auth_router
 
 if getattr(sys, "frozen", False):
     app_root = Path(sys.executable).resolve().parent
@@ -38,6 +38,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(auth_router)
 
 SYSTEM = """당신은 교권 침해 상담 도우미 '디딤'입니다. 한국어로 차분하고 지지적으로 답하세요. 법률 자문이나 확정 판단을 하지 마세요. 제공되지 않은 법령 조항을 지어내지 마세요. 개인정보 최소화, 증거 원본 보존, 관리자 보고, 교원단체·법률 전문가 검토 같은 절차를 안내하세요. 학생에게 해가 되는 조언, 은폐, 보복, 불법행위를 돕지 마세요. 즉각적인 신체 위험이 있으면 안전 확보와 긴급기관 연락을 먼저 권고하세요."""
 
@@ -136,9 +137,9 @@ def assessment_public(item: Assessment) -> AssessmentPublic:
 
 @app.on_event("startup")
 def startup() -> None:
-    SQLModel.metadata.create_all(engine)
-
     if settings.is_sqlite:
+        SQLModel.metadata.create_all(engine)
+
         with engine.connect() as conn:
             cols = {
                 row[1]
@@ -154,8 +155,10 @@ def startup() -> None:
                 )
                 conn.commit()
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
+    UPLOAD_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
 @app.get("/api/health")
 def health() -> dict:
