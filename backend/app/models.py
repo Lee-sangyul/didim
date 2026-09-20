@@ -29,7 +29,6 @@ class User(SQLModel, table=True):
     )
 
     password_hash: str
-
     name: str
 
     role: str = Field(
@@ -48,6 +47,49 @@ class User(SQLModel, table=True):
 
     last_login_at: Optional[str] = Field(
         default=None,
+    )
+
+
+class AuthSession(SQLModel, table=True):
+    """
+    로그인 상태를 유지하기 위한 서버 세션.
+
+    브라우저에 전달한 세션 토큰 원문은 저장하지 않고
+    SHA-256 해시만 token_hash에 저장한다.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True,
+    )
+
+    user_id: int = Field(
+        foreign_key="users.id",
+        index=True,
+    )
+
+    token_hash: str = Field(
+        unique=True,
+        index=True,
+    )
+
+    expires_at: str = Field(
+        index=True,
+    )
+
+    created_at: str = Field(
+        default_factory=now_iso,
+    )
+
+    last_used_at: str = Field(
+        default_factory=now_iso,
+    )
+
+    revoked_at: Optional[str] = Field(
+        default=None,
+        index=True,
     )
 
 
