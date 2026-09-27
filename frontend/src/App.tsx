@@ -573,7 +573,6 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
             </button>
           )}
 
-
         <button
           type="button"
           className="logout-button"
@@ -612,7 +611,6 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                 key={caseItem.id}
               >
                 <i className={caseItem.risk_level} />
-
 
                 <span>
                   <b>{caseItem.title}</b>
