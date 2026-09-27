@@ -1,19 +1,50 @@
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  ApiError,
   attachmentDownloadUrl,
   createCase,
+  getCurrentUser,
   getLatestAssessment,
   getMessages,
   listAttachments,
   listCases,
+  logout,
   removeAttachment,
   removeCase,
   streamChat,
-  uploadAttachment
+  uploadAttachment,
 } from "./api";
-import type { Assessment, Attachment, CaseItem, Message, RiskLevel } from "./types";
 
-const riskLabel: Record<RiskLevel, string> = { low: "낮음", caution: "주의", danger: "위험", emergency: "긴급" };
+import type {
+  AuthUser,
+} from "./api";
+
+import LoginPage from "./LoginPage";
+
+import type {
+  Assessment,
+  Attachment,
+  CaseItem,
+  Message,
+  RiskLevel,
+} from "./types";
+
+
+const riskLabel: Record<RiskLevel, string> = {
+  low: "낮음",
+  caution: "주의",
+  danger: "위험",
+  emergency: "긴급",
+};
+
+
 const initialAssessment: Assessment = {
   level: "low",
   score: 0,
@@ -59,13 +90,19 @@ function renderText(text: string) {
   ));
 }
 
+
 function formatBytes(size: number) {
-  return size < 1024
-    ? `${size}B`
-    : size < 1024 * 1024
-      ? `${(size / 1024).toFixed(1)}KB`
-      : `${(size / 1024 / 1024).toFixed(1)}MB`;
+  if (size < 1024) {
+    return `${size}B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)}KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(1)}MB`;
 }
+
 
 function formatDate(iso: string) {
   try {
@@ -79,7 +116,14 @@ function exportPrint() {
   window.print();
 }
 
-export default function App() {
+
+interface WorkspaceProps {
+  user: AuthUser;
+  onLoggedOut: () => void;
+}
+
+
+function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -92,6 +136,7 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [emptyTitle, setEmptyTitle] = useState(getRandomEmptyTitle);
   const [isListening, setIsListening] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -109,10 +154,33 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // 사용자가 스레드 맨 아래를 보고 있는지 (스크롤 이벤트로 갱신)
+  const stickToBottom = useRef(true);
 
   const active = cases.find(c => c.id === selected);
   const isGreetingOnly = messages.length === 1 && messages[0].role === "assistant";
   const visibleMessages = isGreetingOnly ? [] : messages;
+
+  // ---------- 오류 처리 ----------
+  function handleApiError(caughtError: unknown) {
+    if (caughtError instanceof ApiError && caughtError.status === 401) {
+      onLoggedOut();
+      return;
+    }
+
+    if (caughtError instanceof Error) {
+      setError(caughtError.message);
+      return;
+    }
+
+    setError("요청을 처리하는 중 오류가 발생했습니다.");
+  }
+
+  // 잠깐 보여주고 사라지는 안내. 그 사이 다른 오류가 뜨면 그 오류는 지우지 않음
+  function flashMessage(message: string) {
+    setError(message);
+    setTimeout(() => setError(current => (current === message ? "" : current)), 1500);
+  }
 
   // ---------- 북마크 ----------
   useEffect(() => {
@@ -131,8 +199,7 @@ export default function App() {
   async function copyAnswer(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setError("AI 답변이 복사되었습니다.");
-      setTimeout(() => setError(""), 1500);
+      flashMessage("AI 답변이 복사되었습니다.");
     } catch {
       setError("답변을 복사하지 못했습니다.");
     }
@@ -188,6 +255,11 @@ export default function App() {
     recognition.start();
   }
 
+  // 로그아웃 등으로 화면이 사라질 때 마이크가 켜진 채 남지 않도록 정리
+  useEffect(() => {
+    return () => recognitionRef.current?.abort();
+  }, []);
+
   // ---------- 입력창 자동 높이 ----------
   // 타이핑·음성 입력·전송 후 비우기 모두 input이 바뀌므로 여기서 한 번에 처리
   useEffect(() => {
@@ -204,13 +276,19 @@ export default function App() {
   async function loadAttachments(id: number) {
     try {
       setAttachments(await listAttachments(id));
-    } catch {
+    } catch (caughtError) {
+      if (caughtError instanceof ApiError && caughtError.status === 401) {
+        onLoggedOut();
+        return;
+      }
+
       setAttachments([]);
     }
   }
 
   async function loadAssessment(id: number, fallback?: CaseItem) {
     const latest = await getLatestAssessment(id);
+
     if (latest) {
       setAssessment({
         level: latest.risk_level as RiskLevel,
@@ -234,65 +312,115 @@ export default function App() {
   }
 
   async function refresh(prefer?: number) {
-    const all = await listCases();
-    setCases(all);
-    const id = prefer ?? selected ?? all[0]?.id;
-    if (id) {
-      setSelected(id);
-      setMessages(await getMessages(id));
-      await loadAssessment(id, all.find(x => x.id === id));
-      await loadAttachments(id);
+    const allCases = await listCases();
+    setCases(allCases);
+
+    // selected는 클로저 값이라 방금 삭제한 상담 id일 수 있으므로 목록에 있는지 확인
+    const candidate = prefer ?? selected;
+    const id = candidate != null && allCases.some(c => c.id === candidate)
+      ? candidate
+      : allCases[0]?.id;
+
+    if (id == null) {
+      setSelected(null);
+      setMessages([]);
+      setAttachments([]);
+      setAssessment(initialAssessment);
+      return;
     }
+
+    setSelected(id);
+
+    const [loadedMessages] = await Promise.all([
+      getMessages(id),
+      loadAssessment(id, allCases.find(c => c.id === id)),
+      loadAttachments(id),
+    ]);
+
+    setMessages(loadedMessages);
   }
 
   useEffect(() => {
-    refresh().catch(() => setError("백엔드에 연결할 수 없습니다. start.bat을 실행했는지 확인하세요."));
+    refresh().catch(handleApiError);
   }, []);
 
   // ---------- 스크롤 ----------
-  function scrollToBottom() {
-    thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: "smooth" });
+  function scrollToBottom(behavior: ScrollBehavior = "auto") {
+    const el = thread.current;
+    if (!el) return;
+    stickToBottom.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior });
     setShowNewAnswer(false);
   }
 
-  useEffect(() => {
+  function onThreadScroll() {
     const el = thread.current;
     if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) scrollToBottom();
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    stickToBottom.current = nearBottom;
+    if (nearBottom) setShowNewAnswer(false);
+  }
+
+  useEffect(() => {
+    if (stickToBottom.current) scrollToBottom();
     else setShowNewAnswer(true);
   }, [messages]);
 
   // ---------- 상담 ----------
   async function addCase() {
-    const c = await createCase();
-    setEmptyTitle(current => {
-      const candidates = emptyTitles.filter(title => title !== current);
-      return candidates[Math.floor(Math.random() * candidates.length)];
-    });
-    setAssessment(initialAssessment);
-    setAttachments([]);
-    setResponseTime(null);
-    await refresh(c.id);
-    setRailOpen(false);
+    try {
+      setError("");
+      const createdCase = await createCase();
+      setEmptyTitle(current => {
+        const candidates = emptyTitles.filter(title => title !== current);
+        return candidates[Math.floor(Math.random() * candidates.length)];
+      });
+      setAssessment(initialAssessment);
+      setAttachments([]);
+      setResponseTime(null);
+      stickToBottom.current = true;
+      await refresh(createdCase.id);
+      setRailOpen(false);
+    } catch (caughtError) {
+      handleApiError(caughtError);
+    }
   }
 
   async function choose(id: number) {
-    setSelected(id);
-    setMessages(await getMessages(id));
-    await loadAssessment(id, cases.find(x => x.id === id));
-    await loadAttachments(id);
-    setResponseTime(null);
-    setRailOpen(false);
+    try {
+      setError("");
+      setSelected(id);
+      setResponseTime(null);
+      stickToBottom.current = true;
+
+      const [loadedMessages] = await Promise.all([
+        getMessages(id),
+        loadAssessment(id, cases.find(c => c.id === id)),
+        loadAttachments(id),
+      ]);
+
+      setMessages(loadedMessages);
+      setRailOpen(false);
+    } catch (caughtError) {
+      handleApiError(caughtError);
+    }
   }
 
-  async function del() {
+  async function deleteCase() {
     if (!selected || !confirm("이 상담 기록을 삭제할까요?")) return;
-    await removeCase(selected);
-    setSelected(null);
-    setMessages([]);
-    setAttachments([]);
-    await refresh();
+
+    try {
+      setError("");
+      await removeCase(selected);
+      setSelected(null);
+      setMessages([]);
+      setAttachments([]);
+      setAssessment(initialAssessment);
+      setResponseTime(null);
+      await refresh();
+    } catch (caughtError) {
+      handleApiError(caughtError);
+    }
   }
 
   async function send(e?: FormEvent, forcedContent?: string) {
@@ -301,34 +429,45 @@ export default function App() {
     const content = (forcedContent ?? input).trim();
     if (!content || loading) return;
 
-    let id = selected;
-    if (!id) {
-      const c = await createCase();
-      id = c.id;
-      setSelected(id);
-    }
-
-    setInput("");
+    // 상담 생성 중에도 중복 전송되지 않도록 먼저 잠금
     setError("");
-    const startTime = performance.now();
     setLoading(true);
-
-    setMessages(m => [
-      ...m,
-      { case_id: id!, role: "user", content },
-      { case_id: id!, role: "assistant", content: "" }
-    ]);
+    let placeholderAdded = false;
 
     try {
-      const result = await streamChat(id, content, t =>
+      let id = selected;
+      if (!id) {
+        const createdCase = await createCase();
+        id = createdCase.id;
+        setSelected(id);
+      }
+      const caseId = id;
+
+      setInput("");
+      stickToBottom.current = true;
+      const startTime = performance.now();
+
+      setMessages(m => [
+        ...m,
+        { case_id: caseId, role: "user", content },
+        { case_id: caseId, role: "assistant", content: "" }
+      ]);
+      placeholderAdded = true;
+
+      const result = await streamChat(caseId, content, t =>
         setMessages(m => m.map((x, i) => (i === m.length - 1 ? { ...x, content: x.content + t } : x)))
       );
+      // 여기부터는 답변이 완성됐으므로 이후 오류가 나도 답변을 지우지 않음
+      placeholderAdded = false;
+
       setAssessment(result);
       setResponseTime(Number(((performance.now() - startTime) / 1000).toFixed(1)));
-      await refresh(id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다.");
-      setMessages(m => m.slice(0, -1));
+      await refresh(caseId);
+    } catch (caughtError) {
+      if (placeholderAdded) {
+        setMessages(m => m.slice(0, -1));
+      }
+      handleApiError(caughtError);
     } finally {
       setLoading(false);
     }
@@ -340,21 +479,22 @@ export default function App() {
     e.target.value = "";
     if (!file) return;
 
-    let id = selected;
-    if (!id) {
-      const c = await createCase();
-      id = c.id;
-      setSelected(id);
-      await refresh(id);
-    }
-
     setUploading(true);
     setError("");
+
     try {
-      await uploadAttachment(id!, file);
-      await loadAttachments(id!);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "파일 업로드에 실패했습니다.");
+      let id = selected;
+      if (!id) {
+        const createdCase = await createCase();
+        id = createdCase.id;
+        setSelected(id);
+        await refresh(id);
+      }
+
+      await uploadAttachment(id, file);
+      await loadAttachments(id);
+    } catch (caughtError) {
+      handleApiError(caughtError);
     } finally {
       setUploading(false);
     }
@@ -362,8 +502,34 @@ export default function App() {
 
   async function onDeleteAttachment(attachmentId: number) {
     if (!selected) return;
-    await removeAttachment(selected, attachmentId);
-    await loadAttachments(selected);
+
+    try {
+      setError("");
+      await removeAttachment(selected, attachmentId);
+      await loadAttachments(selected);
+    } catch (caughtError) {
+      handleApiError(caughtError);
+    }
+  }
+
+  // ---------- 로그아웃 ----------
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    setError("");
+
+    try {
+      await logout();
+    } catch (caughtError) {
+      if (!(caughtError instanceof ApiError) || caughtError.status !== 401) {
+        handleApiError(caughtError);
+        setLoggingOut(false);
+        return;
+      }
+    }
+
+    onLoggedOut();
   }
 
   // ---------- 렌더 ----------
@@ -373,7 +539,18 @@ export default function App() {
         <img className="logo-sm" src="/icons/icon.svg" alt="디딤" />
         디딤 — 교권 침해 상담 도우미
         <span className="title-space" />
-        <span className="status">LOCAL</span>
+        <span className="status">CLOUD</span>
+        <span className="current-user">
+          {user.name} · {user.role === "admin" ? "관리자" : "교사"}
+        </span>
+        <button
+          type="button"
+          className="logout-button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? "로그아웃 중…" : "로그아웃"}
+        </button>
       </header>
 
       <div className={`layout ${aside ? "" : "aside-closed"} ${darkMode ? "dark-mode" : ""}`}>
@@ -402,7 +579,10 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div className="privacy">🔒 상담 내용은 이 컴퓨터에 저장됩니다.</div>
+
+          <div className="privacy">
+            🔒 상담은 사용자별로 분리되어 저장됩니다.
+          </div>
         </nav>
 
         <section className="chat">
@@ -417,13 +597,13 @@ export default function App() {
             <button type="button" onClick={() => setDarkMode(x => !x)} title={darkMode ? "라이트 모드" : "다크 모드"}>
               {darkMode ? "☀️" : "🌙"}
             </button>
-            <button onClick={del} disabled={!selected}>삭제</button>
+            <button onClick={deleteCase} disabled={!selected}>삭제</button>
             <button onClick={exportPrint}>내보내기</button>
           </div>
 
-          <div className="thread" ref={thread}>
+          <div className="thread" ref={thread} onScroll={onThreadScroll}>
             {showNewAnswer && (
-              <button type="button" className="new-answer-btn" onClick={scrollToBottom}>↓ 새 답변</button>
+              <button type="button" className="new-answer-btn" onClick={() => scrollToBottom("smooth")}>↓ 새 답변</button>
             )}
 
             {visibleMessages.length === 0 && (
@@ -525,82 +705,6 @@ export default function App() {
             </div>
             <small>일반적인 안내 도구이며 구체적인 판단은 교원단체·법률 전문가의 검토가 필요합니다.</small>
           </form>
-
-          {active && (
-            <section className="report-print">
-              <header className="report-head">
-                <h1>교권 침해 상담 사건 보고서</h1>
-                <p>Case Report for Teacher-Rights Infringement Consultation</p>
-              </header>
-              <table className="report-meta">
-                <tbody>
-                  <tr>
-                    <th>사건 번호</th><td>#{String(active.id).padStart(4, "0")}</td>
-                    <th>작성일</th><td>{formatDate(active.created_at)}</td>
-                  </tr>
-                  <tr>
-                    <th>상담 제목</th><td>{active.title}</td>
-                    <th>최종 수정일</th><td>{formatDate(active.updated_at)}</td>
-                  </tr>
-                  <tr>
-                    <th>사건 분류</th><td>{assessment.category}</td>
-                    <th>위험도</th><td>{riskLabel[assessment.level]} ({assessment.score} / 100)</td>
-                  </tr>
-                </tbody>
-              </table>
-              <section className="report-section">
-                <h2>평가 근거</h2>
-                <p>{assessment.rationale}</p>
-              </section>
-              <section className="report-section">
-                <h2>근거 법령</h2>
-                {assessment.based_law.length ? (
-                  <ul>{assessment.based_law.map(x => <li key={x}>{x}</li>)}</ul>
-                ) : (
-                  <p className="report-muted">확인된 근거 법령이 없습니다.</p>
-                )}
-              </section>
-              <section className="report-section">
-                <h2>권장 대응 조치</h2>
-                {assessment.actions.length ? (
-                  <ol>{assessment.actions.map(x => <li key={x}>{x}</li>)}</ol>
-                ) : (
-                  <p className="report-muted">권장 조치가 없습니다.</p>
-                )}
-              </section>
-              <section className="report-section">
-                <h2>상담 기록</h2>
-                {visibleMessages.map((m, i) => (
-                  <div className="report-msg" key={m.id ?? i}>
-                    <b>{m.role === "assistant" ? "디딤" : "상담자"}</b>
-                    <span>{m.content}</span>
-                  </div>
-                ))}
-              </section>
-              <section className="report-section">
-                <h2>첨부 증거 자료</h2>
-                {attachments.length ? (
-                  <ul>
-                    {attachments.map(a => (
-                      <li key={a.id}>{a.filename} ({formatBytes(a.size)}, {formatDate(a.created_at)})</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="report-muted">첨부된 파일이 없습니다.</p>
-                )}
-              </section>
-              <footer className="report-footer">
-                <p>
-                  본 보고서는 입력된 상담 내용을 바탕으로 자동 생성된 참고 자료이며, 법률적·행정적 최종 판단이 아닙니다.<br />
-                  정확한 처리를 위해 학교 관리자 및 교원단체·법률 전문가의 검토를 받으시기 바랍니다.
-                </p>
-                <div className="report-signature">
-                  <div><span>작성자 확인</span><i /></div>
-                  <div><span>관리자 확인</span><i /></div>
-                </div>
-              </footer>
-            </section>
-          )}
         </section>
 
         {aside && (
@@ -641,23 +745,39 @@ export default function App() {
               {assessment.based_law.length > 0 && (
                 <section className="result">
                   <label>근거 법령</label>
-                  <div><ul className="law-list">{assessment.based_law.map(x => <li key={x}>{x}</li>)}</ul></div>
+                  <div>
+                    <ul className="law-list">
+                      {assessment.based_law.map(law => <li key={law}>{law}</li>)}
+                    </ul>
+                  </div>
                 </section>
               )}
 
               <section className="attachments">
                 <label>증거 자료</label>
                 <div>
-                  <button type="button" className="upload-btn" disabled={uploading} onClick={() => fileInput.current?.click()}>
+                  <button
+                    type="button"
+                    className="upload-btn"
+                    disabled={uploading}
+                    onClick={() => fileInput.current?.click()}
+                  >
                     {uploading ? "업로드 중…" : "📎 파일 첨부"}
                   </button>
+
                   {attachments.length > 0 && (
                     <ul className="file-list">
-                      {attachments.map(a => (
-                        <li key={a.id}>
-                          <a href={attachmentDownloadUrl(a.case_id, a.id)} target="_blank" rel="noreferrer">{a.filename}</a>
-                          <small>{formatBytes(a.size)}</small>
-                          <button type="button" onClick={() => onDeleteAttachment(a.id)}>✕</button>
+                      {attachments.map(attachment => (
+                        <li key={attachment.id}>
+                          <a
+                            href={attachmentDownloadUrl(attachment.case_id, attachment.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {attachment.filename}
+                          </a>
+                          <small>{formatBytes(attachment.size)}</small>
+                          <button type="button" onClick={() => onDeleteAttachment(attachment.id)}>✕</button>
                         </li>
                       ))}
                     </ul>
@@ -674,6 +794,133 @@ export default function App() {
           </aside>
         )}
       </div>
+
+      {active && (
+        <section className="report-print">
+          <header className="report-head">
+            <h1>교권 침해 상담 사건 보고서</h1>
+            <p>Case Report for Teacher-Rights Infringement Consultation</p>
+          </header>
+          <table className="report-meta">
+            <tbody>
+              <tr>
+                <th>사건 번호</th><td>#{String(active.id).padStart(4, "0")}</td>
+                <th>작성일</th><td>{formatDate(active.created_at)}</td>
+              </tr>
+              <tr>
+                <th>상담 제목</th><td>{active.title}</td>
+                <th>최종 수정일</th><td>{formatDate(active.updated_at)}</td>
+              </tr>
+              <tr>
+                <th>사건 분류</th><td>{assessment.category}</td>
+                <th>위험도</th><td>{riskLabel[assessment.level]} ({assessment.score} / 100)</td>
+              </tr>
+            </tbody>
+          </table>
+          <section className="report-section">
+            <h2>평가 근거</h2>
+            <p>{assessment.rationale}</p>
+          </section>
+          <section className="report-section">
+            <h2>근거 법령</h2>
+            {assessment.based_law.length ? (
+              <ul>{assessment.based_law.map(x => <li key={x}>{x}</li>)}</ul>
+            ) : (
+              <p className="report-muted">확인된 근거 법령이 없습니다.</p>
+            )}
+          </section>
+          <section className="report-section">
+            <h2>권장 대응 조치</h2>
+            {assessment.actions.length ? (
+              <ol>{assessment.actions.map(x => <li key={x}>{x}</li>)}</ol>
+            ) : (
+              <p className="report-muted">권장 조치가 없습니다.</p>
+            )}
+          </section>
+          <section className="report-section">
+            <h2>상담 기록</h2>
+            {visibleMessages.map((m, i) => (
+              <div className="report-msg" key={m.id ?? i}>
+                <b>{m.role === "assistant" ? "디딤" : "상담자"}</b>
+                <span>{m.content}</span>
+              </div>
+            ))}
+          </section>
+          <section className="report-section">
+            <h2>첨부 증거 자료</h2>
+            {attachments.length ? (
+              <ul>
+                {attachments.map(a => (
+                  <li key={a.id}>{a.filename} ({formatBytes(a.size)}, {formatDate(a.created_at)})</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="report-muted">첨부된 파일이 없습니다.</p>
+            )}
+          </section>
+          <footer className="report-footer">
+            <p>
+              본 보고서는 입력된 상담 내용을 바탕으로 자동 생성된 참고 자료이며, 법률적·행정적 최종 판단이 아닙니다.<br />
+              정확한 처리를 위해 학교 관리자 및 교원단체·법률 전문가의 검토를 받으시기 바랍니다.
+            </p>
+            <div className="report-signature">
+              <div><span>작성자 확인</span><i /></div>
+              <div><span>관리자 확인</span><i /></div>
+            </div>
+          </footer>
+        </section>
+      )}
     </main>
   );
+}
+
+
+export default function App() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkSession() {
+      try {
+        const currentUser = await getCurrentUser();
+        if (mounted) {
+          setUser(currentUser);
+        }
+      } catch (caughtError) {
+        if (caughtError instanceof ApiError && caughtError.status !== 401) {
+          console.error("세션 확인 실패:", caughtError);
+        }
+        if (mounted) {
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (checkingSession) {
+    return (
+      <main className="session-loading">
+        <div className="session-loading-logo">디</div>
+        <p>로그인 상태를 확인하고 있습니다…</p>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onLoggedIn={loggedInUser => setUser(loggedInUser)} />;
+  }
+
+  return <Workspace user={user} onLoggedOut={() => setUser(null)} />;
 }

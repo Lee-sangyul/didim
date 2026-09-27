@@ -1,14 +1,24 @@
-.claude
+# 실제 환경설정과 비밀값
 .env
+.env.*
+!.env.example
+
+# DB와 업로드 자료
+*.db
+data/
+uploads/
+
+# Python
 .venv/
+venv/
 __pycache__/
 *.pyc
-*.db
+.pytest_cache/
+
+# Node
 node_modules/
 dist/
-Answer_Example.txt
-interview_questions.txt
-TODO.md
-data/
-backend/.pytest_cache/
-package-lock.json
+
+# 기타
+*.log
+.DS_Store
