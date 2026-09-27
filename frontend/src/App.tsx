@@ -613,8 +613,8 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                 <i className={caseItem.risk_level} />
 
                 <span>
-                  <b>{c.title}</b>
-                  <small>{c.category} · {c.risk_score}점</small>
+                  <b>{caseItem.title}</b>
+                  <small>{caseItem.category} · {caseItem.risk_score}점</small>
                 </span>
               </button>
             ))}

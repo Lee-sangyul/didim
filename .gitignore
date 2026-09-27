@@ -22,3 +22,5 @@ dist/
 # 기타
 *.log
 .DS_Store
+*.png
+!mic.png
