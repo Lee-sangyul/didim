@@ -363,9 +363,9 @@ function Workspace({
               (message, index) =>
                 index === currentMessages.length - 1
                   ? {
-                      ...message,
-                      content: message.content + text,
-                    }
+                    ...message,
+                    content: message.content + text,
+                  }
                   : message,
             ),
           );
@@ -489,12 +489,23 @@ function Workspace({
         </span>
 
         <span className="current-user">
-          {user.name} · {
-            user.role === "admin"
-              ? "관리자"
-              : "교사"
-          }
+          {user.name} · {user.role === "admin" ? "관리자" : "교사"}
         </span>
+
+        {(
+          user.role === "admin"
+          || user.role === "super_admin"
+        ) && (
+            <button
+              type="button"
+              className="admin-page-button"
+              onClick={() => {
+                window.location.href = "/admin/registrations";
+              }}
+            >
+              계정 관리
+            </button>
+          )}
 
         <button
           type="button"
@@ -502,9 +513,7 @@ function Workspace({
           onClick={handleLogout}
           disabled={loggingOut}
         >
-          {loggingOut
-            ? "로그아웃 중…"
-            : "로그아웃"}
+          {loggingOut ? "로그아웃 중…" : "로그아웃"}
         </button>
       </header>
 
@@ -551,10 +560,9 @@ function Workspace({
             {cases.map((caseItem) => (
               <button
                 className={
-                  `case ${
-                    selected === caseItem.id
-                      ? "active"
-                      : ""
+                  `case ${selected === caseItem.id
+                    ? "active"
+                    : ""
                   }`
                 }
                 onClick={() => choose(caseItem.id)}
@@ -600,9 +608,9 @@ function Workspace({
               <small>
                 {active
                   ? `사건 #${String(active.id).padStart(
-                      4,
-                      "0",
-                    )}`
+                    4,
+                    "0",
+                  )}`
                   : "상담을 시작하세요"}
               </small>
             </div>
