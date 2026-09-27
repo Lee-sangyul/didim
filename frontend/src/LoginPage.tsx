@@ -168,7 +168,13 @@ export default function LoginPage({
                         분리되어 저장됩니다.
                     </p>
                 </div>
+                <div className="login-register">
+                    <span>아직 계정이 없으신가요?</span>
 
+                    <a href="/register">
+                        계정 발급 신청
+                    </a>
+                </div>
                 <footer className="login-footer">
                     계정 발급 및 비밀번호 초기화는
                     시스템 관리자에게 문의하세요.
