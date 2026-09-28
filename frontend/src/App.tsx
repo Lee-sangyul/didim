@@ -454,8 +454,22 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
       ]);
       placeholderAdded = true;
 
-      const result = await streamChat(caseId, content, t =>
-        setMessages(m => m.map((x, i) => (i === m.length - 1 ? { ...x, content: x.content + t } : x)))
+      const result = await streamChat(
+        id,
+        content,
+        (text) => {
+          setMessages((currentMessages) =>
+            currentMessages.map(
+              (message, index) =>
+                index === currentMessages.length - 1
+                  ? {
+                    ...message,
+                    content: message.content + text,
+                  }
+                  : message,
+            ),
+          );
+        },
       );
       // 여기부터는 답변이 완성됐으므로 이후 오류가 나도 답변을 지우지 않음
       placeholderAdded = false;
@@ -543,6 +557,22 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
         <span className="current-user">
           {user.name} · {user.role === "admin" ? "관리자" : "교사"}
         </span>
+
+        {(
+          user.role === "admin"
+          || user.role === "super_admin"
+        ) && (
+            <button
+              type="button"
+              className="admin-page-button"
+              onClick={() => {
+                window.location.href = "/admin/registrations";
+              }}
+            >
+              계정 관리
+            </button>
+          )}
+
         <button
           type="button"
           className="logout-button"
@@ -569,12 +599,22 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
           <button className="new" onClick={addCase}>＋ 새 상담 시작</button>
           <div className="rail-label">최근 상담</div>
           <div className="case-list">
-            {cases.map(c => (
-              <button className={`case ${selected === c.id ? "active" : ""}`} onClick={() => choose(c.id)} key={c.id}>
-                <i className={c.risk_level} />
+            {cases.map((caseItem) => (
+              <button
+                className={
+                  `case ${selected === caseItem.id
+                    ? "active"
+                    : ""
+                  }`
+                }
+                onClick={() => choose(caseItem.id)}
+                key={caseItem.id}
+              >
+                <i className={caseItem.risk_level} />
+
                 <span>
-                  <b>{c.title}</b>
-                  <small>{c.category} · {c.risk_score}점</small>
+                  <b>{caseItem.title}</b>
+                  <small>{caseItem.category} · {caseItem.risk_score}점</small>
                 </span>
               </button>
             ))}
@@ -589,8 +629,18 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
           <div className="chat-head">
             <button className="menu-btn" aria-label="상담 목록" onClick={() => setRailOpen(x => !x)}>☰</button>
             <div>
-              <h1>{active?.title ?? "새 상담"}</h1>
-              <small>{active ? `사건 #${String(active.id).padStart(4, "0")}` : "상담을 시작하세요"}</small>
+              <h1>
+                {active?.title ?? "새 상담"}
+              </h1>
+
+              <small>
+                {active
+                  ? `사건 #${String(active.id).padStart(
+                    4,
+                    "0",
+                  )}`
+                  : "상담을 시작하세요"}
+              </small>
             </div>
             <span />
             <button onClick={() => setAside(x => !x)}>{aside ? "결과 접기" : "결과 보기"}</button>
