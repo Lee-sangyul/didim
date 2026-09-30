@@ -1,0 +1,412 @@
+/* =========================================================
+   admin.css — 관리자 계정 신청 승인 화면
+   (최신 파일에서 빠져 있어서 이전 버전에서 복원함)
+   ========================================================= */
+
+.admin-registration-page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+
+/* ---------- 상단 헤더 ---------- */
+
+.admin-registration-header {
+  min-height: 74px;
+  padding: 14px max(24px, calc((100vw - 1040px) / 2));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid #33404f;
+  background: var(--rail);
+  color: #dbe4ee;
+}
+
+.admin-registration-title {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.admin-registration-title>button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid #3a4958;
+  border-radius: 8px;
+  background: var(--rail2);
+  color: #dbe4ee;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.admin-registration-title>button:hover {
+  border-color: #4c5d6d;
+  background: #2a3a4b;
+}
+
+.admin-registration-title span {
+  color: #73c8bd;
+  font: 700 10px ui-monospace, monospace;
+  letter-spacing: 0.16em;
+}
+
+.admin-registration-title h1 {
+  margin: 3px 0 2px;
+  color: #ffffff;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+}
+
+.admin-registration-title p {
+  margin: 0;
+  color: #8fa0b0;
+  font-size: 10.5px;
+}
+
+.admin-registration-refresh {
+  padding: 8px 12px;
+  border: 1px solid #3a4958;
+  border-radius: 8px;
+  background: var(--rail2);
+  color: #dbe4ee;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-registration-refresh:hover:not(:disabled) {
+  border-color: #4c5d6d;
+  background: #2a3a4b;
+}
+
+.admin-registration-refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+/* ---------- 본문 ---------- */
+
+.admin-registration-content {
+  width: min(1040px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 28px 0 50px;
+}
+
+.admin-registration-summary {
+  min-height: 72px;
+  padding: 16px 19px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.admin-registration-summary span {
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-registration-summary strong {
+  min-width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--soft);
+  color: var(--accent);
+  font: 800 17px ui-monospace, monospace;
+}
+
+.admin-registration-warning {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid #e8d7a9;
+  border-radius: 9px;
+  background: var(--midbg);
+  color: #7d642d;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.admin-registration-error,
+.admin-registration-message {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-registration-error {
+  border: 1px solid #e4aca7;
+  background: var(--dangerbg);
+  color: var(--danger);
+}
+
+.admin-registration-message {
+  border: 1px solid #b9d8cb;
+  background: var(--lowbg);
+  color: var(--low);
+}
+
+
+/* ---------- 신청 목록 ---------- */
+
+.admin-registration-list {
+  margin-top: 17px;
+  display: grid;
+  gap: 13px;
+}
+
+.admin-registration-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.admin-registration-card>header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.admin-registration-status {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: var(--midbg);
+  color: var(--mid);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-registration-card h2 {
+  margin: 10px 0 3px;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.admin-registration-card header p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 11.5px;
+}
+
+.admin-registration-card time {
+  color: #8a98a6;
+  font: 10.5px ui-monospace, monospace;
+}
+
+
+/* ---------- 신청자 정보 ---------- */
+
+.admin-registration-details {
+  margin: 18px 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.admin-registration-details>div {
+  min-width: 0;
+  padding: 11px 13px;
+  border-right: 1px solid var(--line);
+  background: #f8fafb;
+}
+
+.admin-registration-details>div:last-child {
+  border-right: 0;
+}
+
+.admin-registration-details dt {
+  margin-bottom: 5px;
+  color: #8a98a6;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.admin-registration-details dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ---------- 제출 문서 ---------- */
+
+.admin-registration-document {
+  margin-top: 12px;
+  padding: 12px 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.admin-registration-document>div {
+  min-width: 0;
+}
+
+.admin-registration-document span,
+.admin-registration-document strong {
+  display: block;
+}
+
+.admin-registration-document span {
+  margin-bottom: 4px;
+  color: #8a98a6;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.admin-registration-document strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-registration-document small {
+  flex: 0 0 auto;
+  color: var(--mute);
+  font: 10.5px ui-monospace, monospace;
+}
+
+
+/* ---------- 승인 및 거절 ---------- */
+
+.admin-registration-review {
+  margin-top: 14px;
+  padding-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-registration-review label {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-registration-review label>span {
+  color: var(--mute);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.admin-registration-review input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cdd6de;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.admin-registration-review input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(46, 125, 116, 0.12);
+}
+
+.admin-registration-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-registration-actions button {
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-registration-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-reject-button {
+  border: 1px solid #e4aca7;
+  background: #ffffff;
+  color: var(--danger);
+}
+
+.admin-reject-button:hover:not(:disabled) {
+  background: var(--dangerbg);
+}
+
+.admin-approve-button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.admin-approve-button:hover:not(:disabled) {
+  border-color: #266d65;
+  background: #266d65;
+}
+
+
+/* ---------- 반응형 ---------- */
+
+@media (max-width: 760px) {
+  .admin-registration-header {
+    padding: 13px 15px;
+  }
+
+  .admin-registration-title p {
+    display: none;
+  }
+
+  .admin-registration-content {
+    width: calc(100% - 28px);
+    padding-top: 16px;
+  }
+
+  .admin-registration-details {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-registration-details>div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .admin-registration-details>div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-registration-review {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-registration-actions {
+    justify-content: flex-end;
+  }
+}

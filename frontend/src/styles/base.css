@@ -1,0 +1,27 @@
+/* =========================================================
+   base.css — 전역 기본값
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+}
+
+/* 버튼, 입력창은 기본적으로 글꼴을 상속하지 않는다.
+   이 규칙이 있어야 Pretendard가 버튼/입력창에도 적용됨. */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

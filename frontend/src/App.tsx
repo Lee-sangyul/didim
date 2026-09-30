@@ -962,7 +962,9 @@ export default function App() {
   if (checkingSession) {
     return (
       <main className="session-loading">
-        <div className="session-loading-logo">디</div>
+        <div className="session-loading-logo">
+          <img src="/icons/icon.svg"></img>
+        </div>
         <p>로그인 상태를 확인하고 있습니다…</p>
       </main>
     );

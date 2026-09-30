@@ -5,7 +5,14 @@ import AdminRegistrationPage from "./AdminRegistrationPage";
 import App from "./App";
 import RegistrationPage from "./RegistrationPage";
 
-import "./styles.css";
+//import "./styles.css";
+import './styles/tokens.css'
+import './styles/base.css'
+import './styles/app.css'
+import './styles/composer.css'
+import './styles/login.css'
+import './styles/registration.css'
+import './styles/admin.css'
 
 
 function normalizePath(pathname: string): string {

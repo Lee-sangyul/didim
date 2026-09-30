@@ -1,0 +1,70 @@
+/* =========================================================
+   tokens.css — 디자인 변수
+   ※ 반드시 가장 먼저 import 할 것 (@import는 맨 앞에만 올 수 있음)
+   ========================================================= */
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css');
+
+:root {
+  /* ---------- 브랜드 남색 ----------
+     로그인 소개 영역, 계정 신청 헤더, 관리자 헤더에서 사용.
+     사이드바 색과 분리했으므로 여기 값은 바꾸지 않는다. */
+  --rail: #1b2733;
+  --rail2: #243140;
+
+  /* ---------- 사이드바 + 타이틀바 전용 ----------
+     기본값: 어두운 사이드바.
+     밝은 사이드바를 쓰려면 이 묶음을 아래 주석의 "밝은 사이드바" 값으로 교체. */
+  --side-bg: var(--rail);
+  --side-bg2: var(--rail2);        /* 새 상담 버튼, 로그아웃 버튼 배경 */
+  --side-ink: #dbe4ee;             /* 기본 글자 */
+  --side-strong: #ffffff;          /* 케이스 제목 */
+  --side-btn-ink: #e6edf4;         /* 새 상담 버튼 글자 */
+  --side-mute: #7e8c9c;            /* 보조 글자 */
+  --side-faint: #8fa0b0;           /* 하단 안내문 */
+  --side-line: #33404f;            /* 구분선, 버튼 테두리 */
+  --side-hover: #2a3a4b;           /* 케이스 hover/active */
+  --side-scroll: #3a4857;
+  --side-scroll-hover: #506173;
+  --side-accent: #9cddd4;          /* 관리자 버튼 글자 */
+  --side-accent-hover: #c2eee8;
+  --titlebar-ink: #aab6c2;
+
+  /* 밝은 사이드바
+  --side-bg: #ffffff;
+  --side-bg2: #f1f3f5;
+  --side-ink: #16202b;
+  --side-strong: #000000;
+  --side-btn-ink: #16202b;
+  --side-mute: #7e8c9c;
+  --side-faint: #8fa0b0;
+  --side-line: #dddddd;
+  --side-hover: #f5f5f5;
+  --side-scroll: #d5dbe1;
+  --side-scroll-hover: #b8c1ca;
+  --side-accent: #2e7d74;
+  --side-accent-hover: #266d65;
+  --titlebar-ink: #000000;
+  */
+
+  /* ---------- 공통 ---------- */
+  --bg: #e8edf1;
+  --line: #dde4ea;
+  --ink: #16202b;
+  --mute: #5f6e7d;
+  --accent: #2e7d74;
+  --soft: #e2efed;
+
+  /* ---------- 위험도 ---------- */
+  --low: #2f7d56;
+  --lowbg: #e6f1ea;
+  --mid: #bd8a28;
+  --midbg: #f6efdd;
+  --danger: #bf463c;
+  --dangerbg: #f7e6e4;
+  --emergency: #7a1230;
+  --emergencybg: #f4dbe1;
+
+  font-family: "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif;
+  color: var(--ink);
+}

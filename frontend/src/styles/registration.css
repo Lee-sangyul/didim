@@ -1,0 +1,415 @@
+/* =========================================================
+   registration.css — 계정 신청 화면
+   ========================================================= */
+
+.registration-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 42px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.registration-card,
+.registration-result {
+  width: min(820px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fbfcfd;
+  box-shadow: 0 12px 32px rgba(27, 39, 51, 0.12);
+}
+
+
+/* ---------- 상단 영역 ---------- */
+
+.registration-header {
+  padding: 28px 34px;
+  display: flex;
+  align-items: flex-start;
+  gap: 17px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(58, 155, 144, 0.15), transparent 32%),
+    linear-gradient(145deg, var(--rail), var(--rail2));
+  color: #dbe4ee;
+}
+
+.registration-header h1 {
+  margin: 9px 0 7px;
+  color: #ffffff;
+  font-size: 25px;
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+}
+
+.registration-header p {
+  max-width: 580px;
+  margin: 0;
+  color: #9eacba;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.registration-eyebrow {
+  color: var(--accent);
+  font: 700 10.5px ui-monospace, monospace;
+  letter-spacing: 0.16em;
+}
+
+.registration-header .registration-eyebrow {
+  color: #73c8bd;
+}
+
+.registration-back-button {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #3a4958;
+  border-radius: 9px;
+  background: var(--rail2);
+  color: #dbe4ee;
+  font-size: 19px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.registration-back-button:hover:not(:disabled) {
+  border-color: #4c5d6d;
+  background: #2a3a4b;
+  transform: translateX(-1px);
+}
+
+.registration-back-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+
+/* ---------- 신청 폼 ---------- */
+
+.registration-form {
+  padding: 4px 34px 34px;
+}
+
+.registration-section {
+  padding: 27px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.registration-section-heading {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.registration-section-heading>span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.registration-section-heading h2 {
+  margin: 0 0 3px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.registration-section-heading p {
+  margin: 0;
+  color: #8a98a6;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.registration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.registration-grid label {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.registration-grid label>span {
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.registration-grid input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #cdd6de;
+  border-radius: 9px;
+  outline: none;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 13.5px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.registration-grid input:hover {
+  border-color: #aebbc6;
+}
+
+.registration-grid input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(46, 125, 116, 0.12);
+}
+
+.registration-grid input:disabled {
+  cursor: not-allowed;
+  background: #eef2f5;
+  color: #8a98a6;
+}
+
+.registration-grid small {
+  color: #8a98a6;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+
+/* ---------- 문서 업로드 ---------- */
+
+.registration-file-field {
+  min-height: 130px;
+  margin: 0;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  border: 1px dashed #aebbc6;
+  border-radius: 9px;
+  background: #f6f8fa;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.registration-file-field:hover {
+  border-color: var(--accent);
+  background: var(--soft);
+}
+
+.registration-file-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(46, 125, 116, 0.12);
+}
+
+.registration-file-field input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.registration-file-icon {
+  font-size: 27px;
+}
+
+.registration-file-field strong {
+  max-width: 100%;
+  color: var(--ink);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.registration-file-field small {
+  color: #8a98a6;
+  font-size: 10.5px;
+}
+
+.registration-document-warning {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.registration-document-warning strong {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+
+.registration-document-warning p {
+  margin: 5px 0 0;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+
+/* ---------- 오류와 제출 버튼 ---------- */
+
+.registration-error {
+  margin-top: 19px;
+  padding: 10px 12px;
+  border: 1px solid #e4aca7;
+  border-radius: 8px;
+  background: var(--dangerbg);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.registration-primary-button {
+  width: 100%;
+  height: 46px;
+  margin-top: 22px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.registration-primary-button:hover:not(:disabled) {
+  border-color: #266d65;
+  background: #266d65;
+  box-shadow: 0 7px 16px rgba(46, 125, 116, 0.18);
+  transform: translateY(-1px);
+}
+
+.registration-primary-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.registration-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+
+/* ---------- 신청 완료 화면 ---------- */
+
+.registration-result {
+  max-width: 560px;
+  padding: 46px;
+  text-align: center;
+}
+
+.registration-result-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.registration-result h1 {
+  margin: 12px 0 8px;
+  color: var(--ink);
+  font-size: 23px;
+  letter-spacing: -0.04em;
+}
+
+.registration-result>p {
+  margin: 0;
+  color: var(--mute);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.registration-notice {
+  margin-top: 22px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f6f8fa;
+  text-align: left;
+}
+
+.registration-notice strong {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+
+.registration-notice p {
+  margin: 5px 0 0;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+
+/* ---------- 반응형 ---------- */
+
+@media (max-width: 700px) {
+  .registration-page {
+    padding: 0;
+    background: #fbfcfd;
+  }
+
+  .registration-card,
+  .registration-result {
+    min-height: 100vh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .registration-header {
+    padding: 24px 18px;
+  }
+
+  .registration-form {
+    padding: 2px 18px 28px;
+  }
+
+  .registration-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-grid-spacer {
+    display: none;
+  }
+
+  .registration-result {
+    padding: 54px 22px;
+  }
+}
