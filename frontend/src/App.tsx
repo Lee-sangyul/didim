@@ -549,7 +549,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   // ---------- 렌더 ----------
   return (
     <main className="app-shell">
-      <header className="titlebar">
+      <header className={`titlebar ${darkMode ? "dark-mode" : ""}`}>
         <img className="logo-sm" src="/icons/icon.svg" alt="디딤" />
         디딤 — 교권 침해 상담 도우미
         <span className="title-space" />

@@ -9,7 +9,7 @@
 
 .app-shell {
   height: 100%;
-  background: #fff;
+  background: var(--surface);
   overflow: hidden;
   display: grid;
   grid-template-rows: 38px 1fr;
@@ -265,7 +265,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fbfcfd;
+  background: var(--surface-chat);
 }
 
 .chat-head {
@@ -276,7 +276,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 20px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .chat-head div {
@@ -292,7 +292,7 @@
 }
 
 .chat-head small {
-  color: #8a98a6;
+  color: var(--text-faint);
   font: 10.5px ui-monospace, monospace;
 }
 
@@ -303,7 +303,7 @@
 .chat-head button,
 .aside-head button {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
   color: var(--mute);
   border-radius: 7px;
   padding: 6px 10px;
@@ -375,22 +375,22 @@
 }
 
 .user .avatar {
-  background: #dde6ee;
-  color: #41566a;
+  background: var(--avatar-user-bg);
+  color: var(--avatar-user-ink);
 }
 
 .bubble {
   border: 1px solid var(--line);
   border-radius: 13px;
   border-top-left-radius: 4px;
-  background: #fff;
+  background: var(--surface);
   padding: 13px 15px;
   font-size: 14px;
   line-height: 1.66;
 }
 
 .user .bubble {
-  background: #eef2f6;
+  background: var(--bubble-user);
   border-top-left-radius: 13px;
   border-top-right-radius: 4px;
 }
@@ -399,7 +399,7 @@
   margin: 0 26px 8px;
   padding: 9px 12px;
   border-radius: 7px;
-  background: #fff0ee;
+  background: var(--error-bg);
   color: var(--danger);
   font-size: 12px;
 }
@@ -423,7 +423,7 @@
   border: none;
   outline: none;
   background: transparent;
-  color: #777;
+  color: var(--action-ink);
   border-radius: 7px;
   display: flex;
   align-items: center;
@@ -436,8 +436,8 @@
 
 .copy-btn:hover,
 .retry-btn:hover {
-  background: #f1f1f1;
-  color: #222;
+  background: var(--hover-soft);
+  color: var(--action-ink-hover);
 }
 
 .copy-btn:active,
@@ -452,7 +452,7 @@
 
 .response-time {
   font-size: 11px;
-  color: #999;
+  color: var(--text-faint);
   margin-right: 6px;
 }
 
@@ -461,7 +461,7 @@
 
 .aside {
   border-left: 1px solid var(--line);
-  background: #f6f8fa;
+  background: var(--surface-aside);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -480,7 +480,7 @@
 }
 
 .aside-head small {
-  color: #8a98a6;
+  color: var(--text-faint);
   font-size: 10.5px;
 }
 
@@ -507,7 +507,7 @@ section label {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .8px;
-  color: #8a98a6;
+  color: var(--text-faint);
 }
 
 .risk {
@@ -556,7 +556,7 @@ section label {
 .gauge {
   height: 8px;
   border-radius: 8px;
-  background: #00000012;
+  background: var(--gauge-track);
   margin: 11px 0;
   overflow: hidden;
 }
@@ -577,7 +577,7 @@ section label {
 
 .result div,
 .notice {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 13px;
@@ -615,7 +615,7 @@ section label {
 }
 
 .attachments>div {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 13px;
@@ -628,9 +628,9 @@ section label {
 .upload-btn {
   width: 100%;
   padding: 9px;
-  border: 1px dashed #cdd6de;
+  border: 1px dashed var(--border-input);
   border-radius: 8px;
-  background: #fafbfc;
+  background: var(--surface-sunken);
   color: var(--mute);
   font-weight: 600;
   cursor: pointer;
@@ -673,7 +673,7 @@ section label {
 }
 
 .file-list small {
-  color: #8a98a6;
+  color: var(--text-faint);
   font: 11px ui-monospace, monospace;
 }
 

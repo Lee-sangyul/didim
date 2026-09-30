@@ -6,14 +6,14 @@
 .composer {
   padding: 14px 26px 18px;
   border-top: 1px solid var(--line);
-  background: #f8fafb;
+  background: var(--surface-composer);
 }
 
 .composer>small {
   display: block;
   margin-top: 7px;
   text-align: center;
-  color: #111;
+  color: var(--ink);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.4px;
@@ -28,15 +28,15 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid #cdd6de;
+  border: 1px solid var(--border-input);
   border-radius: 13px;
-  background: #fff;
+  background: var(--surface);
   transition: border-radius 0.15s ease;
 }
 
 .input:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px #b1c9c6;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* 줄 수에 따른 모양 (JS가 input-lines-N 클래스를 붙임) */
@@ -69,6 +69,7 @@
   outline: 0;
   resize: none;
   background: transparent;
+  color: var(--ink);
   font-size: 16px;
   line-height: 24px;
 }
@@ -77,6 +78,7 @@
   font-size: 16px;
   line-height: 24px;
   opacity: 1;
+  color: var(--placeholder);
 }
 
 /* 1줄: 세로 가운데 정렬. padding-right를 꼭 같이 써야 버튼 밑으로 글자가 안 들어감 */
@@ -144,7 +146,7 @@
   border: 0;
   box-shadow: none;
   background: transparent;
-  color: #000;
+  color: var(--icon-ink);
   font-size: 24px;
   font-weight: 400;
 }
@@ -171,25 +173,29 @@
   border: none;
   border-radius: 50%;
   box-shadow: none;
-  background: #fff;
-  color: #000;
+  background: var(--surface);
+  color: var(--icon-ink);
   font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  
-  
 }
 
 .input .voice-btn.listening,
 .input .voice-btn.listening:hover {
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--voice-listening);
 }
 
 .listening-icon {
   font-size: 22px;
 }
-
+.mic-image{
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
 
 /* ---------- 반응형 ---------- */
 

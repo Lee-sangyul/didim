@@ -15,22 +15,8 @@
   /* ---------- 사이드바 + 타이틀바 전용 ----------
      기본값: 어두운 사이드바.
      밝은 사이드바를 쓰려면 이 묶음을 아래 주석의 "밝은 사이드바" 값으로 교체. */
-  --side-bg: var(--rail);
-  --side-bg2: var(--rail2);        /* 새 상담 버튼, 로그아웃 버튼 배경 */
-  --side-ink: #dbe4ee;             /* 기본 글자 */
-  --side-strong: #ffffff;          /* 케이스 제목 */
-  --side-btn-ink: #e6edf4;         /* 새 상담 버튼 글자 */
-  --side-mute: #7e8c9c;            /* 보조 글자 */
-  --side-faint: #8fa0b0;           /* 하단 안내문 */
-  --side-line: #33404f;            /* 구분선, 버튼 테두리 */
-  --side-hover: #2a3a4b;           /* 케이스 hover/active */
-  --side-scroll: #3a4857;
-  --side-scroll-hover: #506173;
-  --side-accent: #9cddd4;          /* 관리자 버튼 글자 */
-  --side-accent-hover: #c2eee8;
-  --titlebar-ink: #aab6c2;
 
-  /* 밝은 사이드바
+  /* 밝은 사이드바 */
   --side-bg: #ffffff;
   --side-bg2: #f1f3f5;
   --side-ink: #16202b;
@@ -45,7 +31,7 @@
   --side-accent: #2e7d74;
   --side-accent-hover: #266d65;
   --titlebar-ink: #000000;
-  */
+  
 
   /* ---------- 공통 ---------- */
   --bg: #e8edf1;
@@ -54,6 +40,31 @@
   --mute: #5f6e7d;
   --accent: #2e7d74;
   --soft: #e2efed;
+  --text-faint: #8a98a6;           /* 작은 보조 글자 */
+  --placeholder: #757575;
+
+  /* ---------- 면(배경) ---------- */
+  --surface: #ffffff;              /* 말풍선, 카드, 헤더, 입력창 */
+  --surface-chat: #fbfcfd;         /* 대화 영역 바탕 */
+  --surface-composer: #f8fafb;     /* 하단 입력 영역 바탕 */
+  --surface-aside: #f6f8fa;        /* 우측 패널 바탕 */
+  --surface-sunken: #fafbfc;       /* 업로드 버튼처럼 살짝 들어간 면 */
+  --border-input: #cdd6de;
+  --focus-ring: #b1c9c6;
+
+  /* ---------- 메시지 ---------- */
+  --bubble-user: #eef2f6;
+  --avatar-user-bg: #dde6ee;
+  --avatar-user-ink: #41566a;
+  --error-bg: #fff0ee;
+
+  /* ---------- 작은 버튼, 아이콘 ---------- */
+  --icon-ink: #000000;             /* 첨부 +, 마이크 */
+  --voice-listening: #bdbdbd;
+  --action-ink: #777777;           /* 복사, 재시도 */
+  --action-ink-hover: #222222;
+  --hover-soft: #f1f1f1;
+  --gauge-track: #00000012;
 
   /* ---------- 위험도 ---------- */
   --low: #2f7d56;
@@ -66,5 +77,81 @@
   --emergencybg: #f4dbe1;
 
   font-family: "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif;
+  color: var(--ink);
+}
+
+
+/* =========================================================
+   다크모드
+   dark-mode 클래스가 붙은 요소와 그 안쪽 전부에 적용된다.
+   <html>에 붙이는 걸 권장 (타이틀바까지 한 번에 바뀜):
+     document.documentElement.classList.toggle('dark-mode', isDark)
+   ========================================================= */
+
+.dark-mode {
+  color-scheme: dark;              /* 스크롤바, 기본 입력 요소도 어둡게 */
+
+  /* 사이드바: 밝은 사이드바를 쓰더라도 다크모드에서는 어둡게 */
+  --side-bg: #111820;
+  --side-bg2: #1a232d;
+  --side-ink: #dbe4ee;
+  --side-strong: #ffffff;
+  --side-btn-ink: #e6edf4;
+  --side-mute: #7e8c9c;
+  --side-faint: #8fa0b0;
+  --side-line: #26313d;
+  --side-hover: #1f2a36;
+  --side-scroll: #2f3b48;
+  --side-scroll-hover: #445464;
+  --side-accent: #9cddd4;
+  --side-accent-hover: #c2eee8;
+  --titlebar-ink: #aab6c2;
+
+  /* 공통 */
+  --bg: #0f151c;
+  --line: #28333f;
+  --ink: #e3e9ef;
+  --mute: #9aa8b6;
+  --accent: #3a9b90;
+  --soft: #1b3533;
+  --text-faint: #75838f;
+  --placeholder: #6f7d8a;
+
+  /* 면 */
+  --surface: #1a232d;
+  --surface-chat: #141b23;
+  --surface-composer: #161e27;
+  --surface-aside: #161e27;
+  --surface-sunken: #1f2934;
+  --border-input: #36434f;
+  --focus-ring: #2a5a54;
+  
+
+  /* 메시지 */
+  --bubble-user: #243140;
+  --avatar-user-bg: #2a3a4b;
+  --avatar-user-ink: #c3d0dc;
+  --error-bg: #3a1d1c;
+
+  /* 작은 버튼, 아이콘 */
+  --icon-ink: #e3e9ef;
+  --voice-listening: #4c5d6d;
+  --action-ink: #8a98a6;
+  --action-ink-hover: #e3e9ef;
+  --hover-soft: #243140;
+  --gauge-track: #ffffff14;
+
+  /* 위험도: 어두운 배경에서 보이도록 글자색은 밝게, 배경은 어둡게 */
+  --low: #5cb88a;
+  --lowbg: #15291f;
+  --mid: #d9a441;
+  --midbg: #2c2514;
+  --danger: #e36b60;
+  --dangerbg: #33191a;
+  --emergency: #e2587e;
+  --emergencybg: #34141f;
+
+  /* 중요: :root의 color: var(--ink)는 :root에서 이미 계산이 끝난 값이 상속된다.
+     여기서 다시 선언해야 바뀐 --ink가 글자색에 반영됨 */
   color: var(--ink);
 }
