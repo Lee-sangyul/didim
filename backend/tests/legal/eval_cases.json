@@ -1,0 +1,11 @@
+{
+  "_comment": "TODO: 사람이 채울 것. 사례(input)와 expected_articles({law, article_no})는 사람이 직접 지정한다. 비어 있는 사례는 채점에서 제외된다.",
+  "cases": [
+    {
+      "id": "case-001",
+      "input": "TODO: 사례 텍스트",
+      "queries": [],
+      "expected_articles": []
+    }
+  ]
+}

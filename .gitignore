@@ -5,7 +5,9 @@
 
 # DB와 업로드 자료
 *.db
-data/
+data/*
+!data/legal/
+data/legal/raw/
 uploads/
 
 # Python
@@ -24,3 +26,10 @@ dist/
 .DS_Store
 *.png
 !mic.png
+
+# dev
+.vscode/
+.claude/
+
+*.md
+!README.md

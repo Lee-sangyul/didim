@@ -168,6 +168,7 @@ class Assessment(SQLModel, table=True):
     rationale: str = ""
     based_law: str = "[]"
     actions: str = "[]"
+    citations: str = "[]"
 
     created_at: str = Field(
         default_factory=now_iso,

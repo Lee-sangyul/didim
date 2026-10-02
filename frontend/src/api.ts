@@ -1,5 +1,6 @@
 import type {
   Assessment,
+  Citation,
   Attachment,
   CaseItem,
   Message,
@@ -36,6 +37,7 @@ export interface AssessmentRecord {
   rationale: string;
   based_law: string[];
   actions: string[];
+  citations?: Citation[];
   created_at: string;
 }
 
