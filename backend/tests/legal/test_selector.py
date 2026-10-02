@@ -63,3 +63,23 @@ def test_build_queries():
     assert build_queries("폭언·위협", ["협박", "폭언"]) == ["폭언", "위협", "협박"]
     assert build_queries("일반 상담") == []
     assert len(build_queries("a b c d e")) == 4
+
+
+def test_flag_off_returns_empty_without_calling_llm():
+    from app.config import settings
+    from app.legal import service
+
+    object.__setattr__(settings, "legal_citations_enabled", False)
+    try:
+        client = FakeClient(error=RuntimeError("must not be called"))
+        assert service.find_citations(client, "m", "폭언·위협", "요약") == []
+    finally:
+        object.__setattr__(settings, "legal_citations_enabled", True)
+
+
+def test_generate_queries_fallback_and_parse():
+    from app.legal.service import generate_queries
+
+    ok = FakeClient('{"queries": ["교육활동 침해행위", "신고의무", "", "a", "b", "c"]}')
+    assert generate_queries(ok, "m", "폭언·위협", "x") == ["교육활동 침해행위", "신고의무", "a", "b"]
+    assert generate_queries(FakeClient("not json"), "m", "폭언·위협", "x") == ["폭언", "위협"]
