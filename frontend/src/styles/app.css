@@ -942,3 +942,42 @@ section label {
     margin: 0 auto;
   }
 }
+/* 근거 조문 카드 */
+.citation-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.citation-card summary {
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.citation-text {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  margin: 8px 0;
+}
+
+.citation-reason,
+.citation-notice {
+  font-size: 12px;
+  color: var(--mute);
+  margin: 6px 0;
+}
+
+.citation-reason em {
+  font-style: normal;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.citation-card a {
+  font-size: 12px;
+  color: var(--accent);
+}

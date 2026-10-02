@@ -26,6 +26,7 @@ import type {
   AuthUser,
 } from "./api";
 
+import CitationCards from "./CitationCards";
 import LoginPage from "./LoginPage";
 
 import type {
@@ -296,7 +297,8 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
         category: latest.category,
         rationale: latest.rationale,
         actions: latest.actions,
-        based_law: latest.based_law
+        based_law: latest.based_law,
+        citations: latest.citations ?? []
       });
     } else if (fallback) {
       setAssessment({
@@ -792,16 +794,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                 </div>
               </section>
 
-              {assessment.based_law.length > 0 && (
-                <section className="result">
-                  <label>근거 법령</label>
-                  <div>
-                    <ul className="law-list">
-                      {assessment.based_law.map(law => <li key={law}>{law}</li>)}
-                    </ul>
-                  </div>
-                </section>
-              )}
+              <CitationCards citations={assessment.citations ?? []} />
 
               <section className="attachments">
                 <label>증거 자료</label>

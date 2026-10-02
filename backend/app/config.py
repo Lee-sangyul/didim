@@ -59,6 +59,9 @@ class Settings:
 
     registration_max_upload_bytes: int
 
+    law_api_oc: str
+    legal_citations_enabled: bool
+
     @property
     def is_sqlite(self) -> bool:
         return self.database_url.startswith(
@@ -158,6 +161,14 @@ def load_settings() -> Settings:
             registration_max_upload_mb
             * 1024
             * 1024
+        ),
+        law_api_oc=os.getenv(
+            "LAW_API_OC",
+            "",
+        ),
+        legal_citations_enabled=read_bool(
+            "LEGAL_CITATIONS_ENABLED",
+            True,
         ),
     )
 

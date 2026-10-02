@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .demo import DemoAssessment, assess, demo_reply
 from .models import Assessment, Attachment, Case, Message, now_iso
+from .legal.schemas import Citation
+from .legal.service import find_citations
 from .privacy import mask_pii
 from .risk import assess_with_claude, bucket, split_countermeasures
 
@@ -90,6 +92,7 @@ class AssessmentPublic(BaseModel):
     rationale: str
     based_law: list[str]
     actions: list[str]
+    citations: list[Citation] = []
     created_at: str
 
 
@@ -129,6 +132,13 @@ def assessment_public(item: Assessment) -> AssessmentPublic:
         actions = json.loads(item.actions or "[]")
     except json.JSONDecodeError:
         actions = []
+    try:
+        citations = [
+            Citation(**c)
+            for c in json.loads(item.citations or "[]")
+        ]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        citations = []
     return AssessmentPublic(
         id=item.id or 0,
         case_id=item.case_id,
@@ -139,6 +149,7 @@ def assessment_public(item: Assessment) -> AssessmentPublic:
         rationale=item.rationale,
         based_law=based_law,
         actions=actions,
+        citations=citations,
         created_at=item.created_at,
     )
 
@@ -182,6 +193,20 @@ def startup() -> None:
                     'PRAGMA table_info("case")'
                 ).fetchall()
             }
+
+            assessment_cols = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    'PRAGMA table_info("assessment")'
+                ).fetchall()
+            }
+
+            if "citations" not in assessment_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE assessment "
+                    "ADD COLUMN citations VARCHAR DEFAULT '[]'"
+                )
+                conn.commit()
 
             if "based_law" not in cols:
                 conn.exec_driver_sql(
@@ -663,6 +688,7 @@ def chat(
         chunks: list[str] = []
         assessment: DemoAssessment = demo_assessment
         based_law: list[str] = []
+        citations: list[Citation] = []
 
         try:
             if demo:
@@ -702,10 +728,36 @@ def chat(
                     for message in prior[-12:]
                 ]
 
+                citations = find_citations(
+                    client,
+                    model_name,
+                    demo_assessment.category,
+                    masked,
+                )
+
+                # 근거 조문은 DB 원문 기반 citations로 대체한다.
+                based_law = [
+                    f"{c.law_name} {c.article_no}"
+                    for c in citations
+                ]
+
+                system_prompt = SYSTEM
+
+                if citations:
+                    system_prompt += (
+                        "\n\n[참고 조문 - 공식 원문. "
+                        "아래 조문만 근거로 언급하세요.]\n"
+                        + "\n\n".join(
+                            f"{c.law_name} {c.article_no} "
+                            f"{c.title or ''}\n{c.text}"
+                            for c in citations
+                        )
+                    )
+
                 with client.messages.stream(
                     model=model_name,
                     max_tokens=1400,
-                    system=SYSTEM,
+                    system=system_prompt,
                     messages=history,
                 ) as stream:
                     for text in stream.text_stream:
@@ -740,7 +792,6 @@ def chat(
                         masked,
                     )
 
-                    based_law = result["based_law"]
 
                     actions = (
                         split_countermeasures(
@@ -837,6 +888,10 @@ def chat(
                         assessment.actions,
                         ensure_ascii=False,
                     ),
+                    citations=json.dumps(
+                        [c.model_dump() for c in citations],
+                        ensure_ascii=False,
+                    ),
                 )
 
                 save.add(saved_assessment)
@@ -850,6 +905,10 @@ def chat(
                         "assessment": {
                             **assessment.__dict__,
                             "based_law": based_law,
+                            "citations": [
+                                c.model_dump()
+                                for c in citations
+                            ],
                         },
                     },
                     ensure_ascii=False,
