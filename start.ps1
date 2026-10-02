@@ -16,6 +16,16 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 Write-Host "[2/4] Python 패키지 확인 중..."
 & ".venv\Scripts\python.exe" -m pip install -r "backend\requirements.txt"
 
+if (Test-Path "data\legal\articles.json") {
+    Write-Host "법령 데이터 준비 중..."
+    Push-Location "backend"
+    & "..\.venv\Scripts\python.exe" -m app.legal.ingest --from-json | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "경고: 법령 데이터 준비에 실패했습니다. 근거 조문이 표시되지 않을 수 있습니다."
+    }
+    Pop-Location
+}
+
 if (-not (Test-Path "frontend\node_modules")) {
     Write-Host "[3/4] 프론트엔드 패키지 설치 중..."
     Push-Location "frontend"

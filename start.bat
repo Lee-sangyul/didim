@@ -8,6 +8,13 @@ if not exist ".venv\Scripts\python.exe" (
 )
 echo [2/4] Python 패키지 확인 중...
 .venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+if exist "data\legal\articles.json" (
+  echo 법령 데이터 준비 중...
+  pushd backend
+  ..\.venv\Scripts\python.exe -m app.legal.ingest --from-json > nul
+  if errorlevel 1 echo 경고: 법령 데이터 준비에 실패했습니다. 근거 조문이 표시되지 않을 수 있습니다.
+  popd
+)
 if not exist "frontend\node_modules" (
   echo [3/4] 프론트엔드 패키지 설치 중...
   pushd frontend
