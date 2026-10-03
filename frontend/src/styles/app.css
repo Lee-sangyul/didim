@@ -415,7 +415,9 @@
 }
 
 .copy-btn,
+.bookmark-btn,
 .retry-btn {
+  flex: none;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -435,14 +437,25 @@
 }
 
 .copy-btn:hover,
+.bookmark-btn:hover,
 .retry-btn:hover {
   background: var(--hover-soft);
   color: var(--action-ink-hover);
 }
 
 .copy-btn:active,
+.bookmark-btn:active,
 .retry-btn:active {
   transform: scale(0.94);
+}
+
+.bookmark-btn.on {
+  color: var(--accent);
+}
+
+.copy-btn svg,
+.bookmark-btn svg {
+  display: block;
 }
 
 .retry-btn:disabled {

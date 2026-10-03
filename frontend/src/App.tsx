@@ -682,8 +682,17 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                       {responseTime !== null && i === visibleMessages.length - 1 && (
                         <span className="response-time">답변 완료 · {responseTime.toFixed(1)}초</span>
                       )}
-                      <button type="button" className="copy-btn" onClick={() => copyAnswer(m.content)}>
-                        📋 복사
+                      <button
+                        type="button"
+                        className="copy-btn"
+                        onClick={() => copyAnswer(m.content)}
+                        title="답변 복사"
+                        aria-label="답변 복사"
+                      >
+                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="9" y="9" width="11" height="11" rx="2" />
+                          <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+                        </svg>
                       </button>
                       {m.id != null && (
                         <button
@@ -691,8 +700,12 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                           className={`bookmark-btn ${bookmarks.includes(m.id) ? "on" : ""}`}
                           onClick={() => toggleBookmark(m.id!)}
                           title={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
+                          aria-label={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
+                          aria-pressed={bookmarks.includes(m.id)}
                         >
-                          {bookmarks.includes(m.id) ? "★" : "☆"} 북마크
+                          <svg viewBox="0 0 24 24" width="17" height="17" fill={bookmarks.includes(m.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" />
+                          </svg>
                         </button>
                       )}
                     </div>
