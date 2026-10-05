@@ -7,7 +7,7 @@
 *.db
 data/*
 !data/legal/
-data/legal/raw/
+!data/legal/raw/
 uploads/
 
 # Python
@@ -19,7 +19,7 @@ __pycache__/
 
 # Node
 node_modules/
-dist/
+!frontend/dist/
 
 # 기타
 *.log

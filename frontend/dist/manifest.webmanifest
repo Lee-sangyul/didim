@@ -1,0 +1,16 @@
+{
+  "name": "디딤 — 교권 침해 상담 도우미",
+  "short_name": "디딤",
+  "description": "교권 침해 상황을 정리하고 대응을 지원하는 로컬 상담 도우미",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#e8edf1",
+  "theme_color": "#1b2733",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
