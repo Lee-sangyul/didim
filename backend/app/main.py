@@ -388,6 +388,11 @@ def delete_case(
     for item in assessments_to_delete:
         session.delete(item)
 
+    # 관계(relationship)가 없어 SQLAlchemy가 삭제 순서를 보장하지 않으므로,
+    # 외래키 순서(평가 -> 메시지 -> 상담)대로 단계마다 flush한다.
+    # (SQLite는 FK를 강제하지 않아 문제가 없지만 Postgres는 FK 위반으로 실패한다.)
+    session.flush()
+
     attachments_to_delete = session.exec(
         select(Attachment).where(
             Attachment.case_id == case_id
@@ -415,6 +420,8 @@ def delete_case(
 
     for message in messages_to_delete:
         session.delete(message)
+
+    session.flush()
 
     session.delete(case)
     session.commit()
