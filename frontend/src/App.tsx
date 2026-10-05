@@ -1,3 +1,6 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 import {
   ChangeEvent,
   FormEvent,
@@ -675,7 +678,17 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                   {m.role === "assistant" ? <img src="/icons/icon.svg" alt="디딤" /> : "나"}
                 </div>
                 <div className="bubble">
-                  {renderText(m.content || "답변을 정리하고 있습니다…")}
+                  {m.role === "assistant" ? (
+                    <div className="markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {m.content || "답변을 정리하고 있습니다…"}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="user-message">
+                      {m.content || ""}
+                    </div>
+                  )}
 
                   {m.role === "assistant" && m.content && !loading && (
                     <div className="message-actions">
@@ -763,7 +776,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                   )}
                 </button>
 
-                <button type="submit" className="send-btn" disabled={loading || input.trim().length < 2}>
+                <button type="submit" className="send-btn" disabled={loading || input.trim().length < 1}>
                   {loading ? "…" : "➜"}
                 </button>
               </div>
