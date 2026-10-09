@@ -59,7 +59,7 @@ class CreateCase(BaseModel):
 
 
 class ChatInput(BaseModel):
-    content: str = Field(min_length=2, max_length=8000)
+    content: str = Field(min_length=1, max_length=8000)
 
 
 class CasePublic(BaseModel):
