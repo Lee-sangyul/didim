@@ -133,6 +133,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const [loading, setLoading] = useState(false);
   const [aside, setAside] = useState(true);
   const [error, setError] = useState("");
+  const [inputLines, setInputLines] = useState(1);
   const [inputExpanded, setInputExpanded] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -161,6 +162,70 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const active = cases.find(c => c.id === selected);
   const isGreetingOnly = messages.length === 1 && messages[0].role === "assistant";
   const visibleMessages = isGreetingOnly ? [] : messages;
+
+  function changeVersion(msgId: number, delta: number) {
+    setActiveVersions(prev => {
+      const curActive = prev[msgId] ?? 0;
+      const versions = messageVersions[msgId] || [""];
+      const nextActive = Math.max(0, Math.min(versions.length - 1, curActive + delta));
+      return { ...prev, [msgId]: nextActive };
+    });
+  }
+
+  async function regenerateAnswer(assistantMessage: Message, messageIndex: number) {
+    if (!selected || loading) return;
+    let promptText = "";
+    for (let idx = messageIndex - 1; idx >= 0; idx--) {
+      if (visibleMessages[idx].role === "user") {
+        promptText = visibleMessages[idx].content;
+        break;
+      }
+    }
+    if (!promptText) {
+      promptText = "이전 상황에 대해 다시 검토하고 대응 절차를 안내해 주세요.";
+    }
+
+    setLoading(true);
+    setError("");
+    const startTime = performance.now();
+    const msgId = assistantMessage.id;
+    if (msgId == null) {
+      setLoading(false);
+      return;
+    }
+
+    const baselineMessages = [...messages];
+
+    try {
+      let newContent = "";
+      let nextVersionIdx = 0;
+      setMessageVersions(prev => {
+        const cur = prev[msgId] || [assistantMessage.content];
+        nextVersionIdx = cur.length;
+        return { ...prev, [msgId]: [...cur, ""] };
+      });
+      setActiveVersions(prev => ({ ...prev, [msgId]: nextVersionIdx }));
+
+      const newAssessment = await streamChat(selected, promptText, (deltaText) => {
+        newContent += deltaText;
+        setMessageVersions(prev => {
+          const cur = prev[msgId] || [assistantMessage.content];
+          const updated = [...cur];
+          updated[updated.length - 1] = newContent;
+          return { ...prev, [msgId]: updated };
+        });
+      });
+
+      setAssessment(newAssessment);
+      setResponseTime((performance.now() - startTime) / 1000);
+
+      setMessages(baselineMessages);
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // ---------- 오류 처리 ----------
   function handleApiError(caughtError: unknown) {
@@ -362,6 +427,9 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
     stickToBottom.current = nearBottom;
     if (nearBottom) setShowNewAnswer(false);
   }
+
+  const [messageVersions, setMessageVersions] = useState<Record<number, string[]>>({});
+  const [activeVersions, setActiveVersions] = useState<Record<number, number>>({});
 
   useEffect(() => {
     if (stickToBottom.current) scrollToBottom();
@@ -669,50 +737,95 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
               </div>
             )}
 
-            {visibleMessages.map((m, i) => (
-              <article className={`message ${m.role}`} key={m.id ?? i}>
-                <div className="avatar">
-                  {m.role === "assistant" ? <img src="/icons/icon.svg" alt="디딤" /> : "나"}
-                </div>
-                <div className="bubble">
-                  {renderText(m.content || "답변을 정리하고 있습니다…")}
+            {visibleMessages.map((m, i) => {
+              const versions = m.id != null ? (messageVersions[m.id] || [m.content]) : [m.content];
+              const activeIdx = m.id != null ? (activeVersions[m.id] ?? 0) : 0;
+              const displayedContent = versions[activeIdx] ?? m.content;
+              const versionsCount = versions.length;
+              const currentVersionNum = activeIdx + 1;
 
-                  {m.role === "assistant" && m.content && !loading && (
-                    <div className="message-actions">
-                      {responseTime !== null && i === visibleMessages.length - 1 && (
-                        <span className="response-time">답변 완료 · {responseTime.toFixed(1)}초</span>
-                      )}
-                      <button
-                        type="button"
-                        className="copy-btn"
-                        onClick={() => copyAnswer(m.content)}
-                        title="답변 복사"
-                        aria-label="답변 복사"
-                      >
-                        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="9" y="9" width="11" height="11" rx="2" />
-                          <path d="M5 15V6a2 2 0 0 1 2-2h9" />
-                        </svg>
-                      </button>
-                      {m.id != null && (
+              return (
+                <article className={`message ${m.role}`} key={m.id ?? i}>
+                  <div className="avatar">
+                    {m.role === "assistant" ? <img src="/icons/icon.svg" alt="디딤" /> : "나"}
+                  </div>
+                  <div className="bubble">
+                    {renderText(displayedContent || "답변을 정리하고 있습니다…")}
+
+                    {m.role === "assistant" && m.content && !loading && (
+                      <div className="message-actions">
+                        {responseTime !== null && i === visibleMessages.length - 1 && (
+                          <span className="response-time">답변 완료 · {responseTime.toFixed(1)}초</span>
+                        )}
                         <button
                           type="button"
-                          className={`bookmark-btn ${bookmarks.includes(m.id) ? "on" : ""}`}
-                          onClick={() => toggleBookmark(m.id!)}
-                          title={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
-                          aria-label={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
-                          aria-pressed={bookmarks.includes(m.id)}
+                          className="copy-btn"
+                          onClick={() => copyAnswer(displayedContent)}
+                          title="답변 복사"
+                          aria-label="답변 복사"
                         >
-                          <svg viewBox="0 0 24 24" width="17" height="17" fill={bookmarks.includes(m.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" />
+                          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <rect x="9" y="9" width="11" height="11" rx="2" />
+                            <path d="M5 15V6a2 2 0 0 1 2-2h9" />
                           </svg>
                         </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))}
+                        {m.id != null && (
+                          <button
+                            type="button"
+                            className={`bookmark-btn ${bookmarks.includes(m.id) ? "on" : ""}`}
+                            onClick={() => toggleBookmark(m.id!)}
+                            title={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
+                            aria-label={bookmarks.includes(m.id) ? "북마크 해제" : "북마크"}
+                            aria-pressed={bookmarks.includes(m.id)}
+                          >
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill={bookmarks.includes(m.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" />
+                            </svg>
+                          </button>
+                        )}
+                        {!m.content.includes("안녕하세요. 겪고 계신 상황을 시간 순서대로 적어 주세요") && (
+                          <>
+                            <button
+                              type="button"
+                              className="regenerate-btn"
+                              onClick={() => regenerateAnswer(m, i)}
+                              title="답변 다시 생성하기"
+                              aria-label="답변 다시 생성하기"
+                              style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--mute)', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.73-5.73" />
+                              </svg>
+                            </button>
+                            {versionsCount >= 2 && (
+                              <span className="version-nav" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: '6px', padding: '2px 8px', background: 'var(--surface)' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => changeVersion(m.id!, -1)}
+                                  disabled={currentVersionNum <= 1}
+                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum > 1 ? 'pointer' : 'default', opacity: currentVersionNum > 1 ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
+                                >
+                                  &lt;
+                                </button>
+                                <span>{currentVersionNum}/{versionsCount}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => changeVersion(m.id!, 1)}
+                                  disabled={currentVersionNum >= versionsCount}
+                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum < versionsCount ? 'pointer' : 'default', opacity: currentVersionNum < versionsCount ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
+                                >
+                                  &gt;
+                                </button>
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
           {error && <div className="error">{error}</div>}
@@ -721,7 +834,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
           <input ref={fileInput} type="file" className="file-hidden" onChange={onUpload} />
 
           <form className="composer" onSubmit={send}>
-            <div className={`input ${inputExpanded ? "expanded" : ""}`}>
+            <div className={`input input-lines-${Math.min(inputLines, 5)}`}>
               <button
                 type="button"
                 className="attach-btn"
