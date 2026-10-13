@@ -66,6 +66,8 @@ const emptyTitles = [
 ];
 
 const TEXTAREA_MAX_LINES = 5;
+// 전송 가능한 최소 글자 수. 백엔드 ChatInput.min_length와 같아야 한다(scripts R009가 점검).
+const MIN_MESSAGE_LENGTH = 1;
 
 function getRandomEmptyTitle() {
   return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
@@ -811,7 +813,6 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                               onClick={() => regenerateAnswer(m)}
                               title="답변 다시 생성하기"
                               aria-label="답변 다시 생성하기"
-                              style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--mute)', display: 'inline-flex', alignItems: 'center' }}
                             >
                               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.73-5.73" />
@@ -819,12 +820,11 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                             </button>
                             )}
                             {versionsCount >= 2 && (
-                              <span className="version-nav" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: '6px', padding: '2px 8px', background: 'var(--surface)' }}>
+                              <span className="version-nav">
                                 <button
                                   type="button"
                                   onClick={() => changeVersion(m.id!, -1)}
                                   disabled={currentVersionNum <= 1}
-                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum > 1 ? 'pointer' : 'default', opacity: currentVersionNum > 1 ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
                                 >
                                   &lt;
                                 </button>
@@ -833,7 +833,6 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                                   type="button"
                                   onClick={() => changeVersion(m.id!, 1)}
                                   disabled={currentVersionNum >= versionsCount}
-                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum < versionsCount ? 'pointer' : 'default', opacity: currentVersionNum < versionsCount ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
                                 >
                                   &gt;
                                 </button>
@@ -898,7 +897,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                   )}
                 </button>
 
-                <button type="submit" className="send-btn" disabled={loading || input.trim().length < 2}>
+                <button type="submit" className="send-btn" disabled={loading || input.trim().length < MIN_MESSAGE_LENGTH}>
                   {loading ? "…" : "➜"}
                 </button>
               </div>
