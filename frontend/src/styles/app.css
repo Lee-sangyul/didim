@@ -1065,3 +1065,38 @@ section label {
 .dark-mode .input {
   border: 1px solid var(--line) !important;
 }
+
+/* 새 답변 알림 버튼: 스크롤이 위쪽일 때 대화 하단에 떠서 맨 아래로 이동시킨다 (CSS 분리 중 소실되어 복구) */
+.new-answer-btn {
+  position: sticky;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  animation: new-answer-pop 0.2s ease-out;
+}
+
+.new-answer-btn:hover {
+  background: var(--hover-soft);
+}
+
+@keyframes new-answer-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

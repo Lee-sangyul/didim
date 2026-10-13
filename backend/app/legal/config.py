@@ -1,8 +1,14 @@
+import os
 from pathlib import Path
 
 from ..config import ROOT
 
-LEGAL_DATA_DIR: Path = ROOT / "data" / "legal"
+# 기본은 <저장소>/data/legal. 점검 스크립트(scripts/check.py)처럼 격리된 위치가 필요할 때만 환경변수로 바꾼다.
+LEGAL_DATA_DIR: Path = (
+    Path(os.environ["LEGAL_DATA_DIR"])
+    if os.environ.get("LEGAL_DATA_DIR")
+    else ROOT / "data" / "legal"
+)
 RAW_DIR: Path = LEGAL_DATA_DIR / "raw"
 ARTICLES_JSON: Path = LEGAL_DATA_DIR / "articles.json"
 

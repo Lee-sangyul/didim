@@ -430,3 +430,26 @@
     justify-content: flex-end;
   }
 }
+
+/* 신청 목록이 비었을 때의 안내 상자 (CSS 분리 중 소실되어 복구) */
+.admin-registration-empty {
+  margin-top: 17px;
+  padding: 55px 20px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--mute);
+  font-size: 12px;
+  text-align: center;
+}
+
+.admin-registration-empty strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.admin-registration-empty p {
+  margin: 0;
+}
