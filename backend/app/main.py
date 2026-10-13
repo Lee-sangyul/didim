@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .legal.bootstrap import ensure_legal_db
 from .database import engine, init_sqlite_schema  # noqa: F401  (engine: 테스트가 사용)
 from .routers import auth_router
 from .routers.admin_registration import (
@@ -43,6 +44,13 @@ def startup() -> None:
         exist_ok=True,
     )
 
+    # 법령 검색 DB를 articles.json에서 준비한다. 실패해도 서버는 뜬다(근거 조문만 빠짐).
+    app.state.legal = (
+        ensure_legal_db()
+        if settings.legal_citations_enabled
+        else {"status": "disabled", "laws": 0, "articles": 0}
+    )
+
 
 @app.get("/api/health")
 def health() -> dict:
@@ -53,6 +61,12 @@ def health() -> dict:
         "mode": "demo" if demo else "claude",
         "environment": settings.app_env,
     }
+
+
+@app.get("/api/health/legal")
+def health_legal() -> dict:
+    """법령 검색 DB 준비 상태(ready | rebuilt | missing_source | error | disabled)와 건수."""
+    return getattr(app.state, "legal", None) or {"status": "unknown", "laws": 0, "articles": 0}
 
 
 # 모든 API 라우터 뒤에 등록해야 한다 (catch-all 라우트 포함)

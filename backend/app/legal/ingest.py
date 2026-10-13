@@ -9,6 +9,7 @@ import argparse
 import json
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -106,8 +107,8 @@ def export_json(session: Session) -> int:
     return len(laws)
 
 
-def load_from_json(session: Session) -> None:
-    data = json.loads(ARTICLES_JSON.read_text("utf-8"))
+def load_from_json(session: Session, path: Path = ARTICLES_JSON) -> None:
+    data = json.loads(path.read_text("utf-8"))
     for item in data["laws"]:
         parsed = ParsedLaw(
             name=item["name"],
