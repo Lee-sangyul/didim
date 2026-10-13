@@ -12,7 +12,7 @@ export default function CitationCards({
   const asOf = citations[0].as_of;
 
   return (
-    <section className="result citations">
+    <section className="result">
       <label>근거 조문</label>
       <div>
         {citations.map(c => (

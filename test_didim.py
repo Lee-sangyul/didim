@@ -87,8 +87,9 @@ def main():
                         session.commit()
                     self.client = self.enterContext(TestClient(api.app))
                     # 외부 호출이 추가되더라도 데모 테스트에서 사용되면 실패한다.
-                    self.enterContext(patch.object(api, 'Anthropic', side_effect=AssertionError('외부 AI 호출 발생')))
-                    self.enterContext(patch.object(api, 'find_citations', side_effect=AssertionError('외부 법령 호출 발생')))
+                    chat_service = importlib.import_module('app.services.chat_service')
+                    self.enterContext(patch.object(chat_service, 'Anthropic', side_effect=AssertionError('외부 AI 호출 발생')))
+                    self.enterContext(patch.object(chat_service, 'find_citations', side_effect=AssertionError('외부 법령 호출 발생')))
 
                 def login(self, username='teacher_a', client=None):
                     client = client or self.client

@@ -157,6 +157,37 @@ Windows에서는 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요.
 - 상담 API는 한 글자 입력을 허용하지만, 현재 화면의 보내기 버튼은 공백 제거 후 두 글자 미만일 때 비활성화됩니다.
 - 웹 앱의 정적 화면은 캐시될 수 있지만 상담 API·AI 답변은 서버 연결이 필요합니다.
 
+> AI에게 이 저장소를 맡길 때는 먼저 [`AGENTS.md`](AGENTS.md)를 읽게 하세요(금지 사항, 운영 DB·개인정보 주의점, 작업 후 점검 방법).
+
+## 릴리스 점검 (`scripts/check.py`)
+
+배포·인수인계 전에 한 번에 돌리는 점검입니다. 외부 서비스(Claude, 법제처, Supabase)를 호출하지 않고,
+개발 DB·업로드·법령 DB는 건드리지 않습니다(모두 임시 폴더에서만 만들고 지움).
+
+```bash
+python scripts/check.py                  # 전체 (약 10초)
+python scripts/check.py --list           # 단계 목록
+python scripts/check.py --only unit e2e  # 일부 단계만
+python scripts/check.py -v               # 통과 항목의 상세도 출력
+```
+
+| 단계 | 내용 |
+| --- | --- |
+| `env` | 파이썬·Node·의존성·Postgres 바이너리 확인 |
+| `legal` | `articles.json` → `legal.db` 복원, 수집 대상 법령 누락, 검색 스모크 |
+| `unit` / `legacy` | `pytest backend`, 기존 `test_didim.py`(수정하지 않고 호출만) |
+| `migrate` | 임시 Postgres에 `alembic upgrade head` → 모델 일치 → 되돌리기·재적용 |
+| `e2e` | 로그인→상담→채팅→첨부→타인 차단→삭제→로그아웃 (SQLite+외래키 강제, Postgres 각각) |
+| `server` | 실제 서버 프로세스를 띄워 HTTP로 로그인·채팅 |
+| `frontend` | `tsc` 타입 검사 + `vite build` (저장소 파일은 바꾸지 않음) |
+| `release` | 비밀키 커밋 여부, 필수 파일, `.env.example`, 의존성 고정 |
+| `regress` | `scripts/regressions.json`에 기록된 과거 결함의 재발·미해결 상태 |
+
+- Postgres(`initdb`, `pg_ctl`)가 없는 PC에서는 `migrate`/`e2e`의 Postgres 항목이 `WARN`으로 표시됩니다. 운영 DB가 Postgres이므로 릴리스 전에는 설치된 PC에서 돌리세요.
+- 판정: `FAIL`이 있거나 미해결 `blocker`가 있으면 종료 코드 1(릴리스 불가)입니다.
+- 새로 결함을 고치면 `scripts/regressions.json`에 사례를 추가하고 `scripts/checks/regressions.py`에 재발 점검 함수를 만드세요. 이미 겪은 문제 목록이므로 작업 전에 먼저 읽어 보면 좋습니다.
+- 한계: 브라우저를 띄우는 화면 E2E는 없습니다(도구를 추가하지 않기로 함). 화면 동작은 빌드·정적 검사와 수동 확인에 의존합니다.
+
 ## 주요 경로
 
 | 경로 | 내용 |
@@ -164,8 +195,10 @@ Windows에서는 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요.
 | `frontend/src/App.tsx` | 상담 화면과 인쇄용 보고서 |
 | `frontend/src/RegistrationPage.tsx` | 교직원 계정 신청 |
 | `frontend/src/AdminRegistrationPage.tsx` | 관리자 신청 심사 |
-| `backend/app/main.py` | 상담·메시지·첨부·위험도 API |
-| `backend/app/routers/` | 로그인 및 계정 발급 API |
+| `backend/app/main.py` | 앱 생성·라우터 등록·시작 시 초기화 |
+| `backend/app/routers/` | HTTP 엔드포인트: 로그인(`auth`), 계정 발급(`registration`, `admin_registration`), 상담(`cases`), 첨부(`attachments`), 채팅(`chat`) |
+| `backend/app/services/` | 업무 로직: 채팅 파이프라인(`chat_service`), 상담 조회·변환(`case_service`), 인증, 저장소 |
+| `backend/app/schemas/` | API 요청·응답 모델 |
 | `backend/app/legal/` | 법령 수집·검색·조문 선택 |
 | `backend/app/models.py` | 데이터 모델 |
 | `backend/migrations/` | 메인 DB 마이그레이션 |
