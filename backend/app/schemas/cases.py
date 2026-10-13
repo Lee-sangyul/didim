@@ -1,6 +1,8 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+import json
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..legal.schemas import Citation
 
@@ -30,7 +32,19 @@ class MessagePublic(BaseModel):
     case_id: int
     role: str
     content: str
+    versions: list[str] = []
     created_at: str
+
+    @field_validator("versions", mode="before")
+    @classmethod
+    def _parse_versions(cls, value):
+        # DB에는 JSON 문자열로 저장돼 있다
+        if isinstance(value, str):
+            try:
+                value = json.loads(value or "[]")
+            except json.JSONDecodeError:
+                return []
+        return value if isinstance(value, list) else []
 
 
 class AssessmentPublic(BaseModel):

@@ -266,24 +266,10 @@ export async function getLatestAssessment(
 }
 
 
-export async function streamChat(
-  id: number,
-  content: string,
+async function readChatStream(
+  response: Response,
   onDelta: (text: string) => void,
 ): Promise<Assessment> {
-  const response = await apiFetch(
-    `/api/cases/${id}/chat`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        content,
-      }),
-    },
-  );
-
   if (!response.body) {
     throw new ApiError(
       "상담 응답을 읽을 수 없습니다.",
@@ -354,4 +340,46 @@ export async function streamChat(
   }
 
   return assessment;
+}
+
+
+export async function streamChat(
+  id: number,
+  content: string,
+  onDelta: (text: string) => void,
+): Promise<Assessment> {
+  const response = await apiFetch(
+    `/api/cases/${id}/chat`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content,
+      }),
+    },
+  );
+
+  return readChatStream(response, onDelta);
+}
+
+
+/**
+ * 마지막 답변을 다시 생성한다. 서버가 기존 답변 메시지에 새 버전을 누적하므로
+ * 완료 후 메시지 목록을 다시 불러와야 버전이 반영된다.
+ */
+export async function streamRegenerate(
+  caseId: number,
+  messageId: number,
+  onDelta: (text: string) => void,
+): Promise<Assessment> {
+  const response = await apiFetch(
+    `/api/cases/${caseId}/messages/${messageId}/regenerate`,
+    {
+      method: "POST",
+    },
+  );
+
+  return readChatStream(response, onDelta);
 }

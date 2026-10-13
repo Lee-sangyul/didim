@@ -125,13 +125,13 @@
       "id": "R010",
       "title": "답변 다시 생성이 DB에 사용자 메시지를 중복 저장",
       "area": "backend",
-      "status": "open",
+      "status": "fixed",
       "severity": "major",
       "symptom": "다시 생성할 때마다 같은 질문과 새 답변이 DB에 쌓임. 새로고침하면 중복이 보이고 Claude 대화 이력도 오염. 버전 목록은 React state라 새로고침하면 사라짐",
       "root_cause": "regenerateAnswer가 일반 /chat 엔드포인트를 재사용",
-      "fix": "전용 재생성 엔드포인트(기존 사용자 메시지 재사용, 답변 버전 저장)",
+      "fix": "POST /api/cases/{id}/messages/{message_id}/regenerate. 새 사용자 메시지를 만들지 않고 기존 답변 메시지의 versions(JSON)에 버전을 누적한다. 마지막 답변만 허용, 최대 10버전. 프런트는 완료 후 서버 값으로 동기화",
       "check": "r010_regenerate_endpoint_exists",
-      "refs": "frontend/src/App.tsx regenerateAnswer"
+      "refs": "backend/app/services/chat_service.py start_regeneration, migration c4d5e6f7a8b9, frontend/src/App.tsx"
     },
     {
       "id": "R011",
@@ -192,6 +192,18 @@
       "fix": "className + CSS(토큰 사용)로 이전하고 frontend_static.UNSTYLED_OK 항목을 제거",
       "check": "r015_no_inline_styles",
       "refs": "frontend/src/App.tsx"
+    },
+    {
+      "id": "R016",
+      "title": "모델 컬럼 추가 후 운영 DB에 마이그레이션이 적용되기 전에 코드를 배포하면 조회가 깨짐",
+      "area": "release",
+      "status": "open",
+      "severity": "major",
+      "symptom": "새 코드가 message.versions 등 새 컬럼을 조회하는 순간 운영 DB(Postgres)에 컬럼이 없어 오류(R003과 같은 유형)",
+      "root_cause": "마이그레이션 적용과 코드 배포가 분리돼 있고 순서를 강제하는 장치가 없음",
+      "fix": "배포 절차에 '1) alembic upgrade head(운영 DB) 2) 코드 배포' 순서를 명시. 자동화 전까지 릴리스 체크리스트로 관리",
+      "check": null,
+      "refs": "R003, backend/migrations/versions/c4d5e6f7a8b9_add_message_versions.py"
     }
   ]
 }

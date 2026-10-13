@@ -86,9 +86,37 @@ def run_scenario(label: str) -> list[Result]:
                 keys = {"level", "score", "category", "rationale", "actions", "based_law", "citations"}
                 step("응답에 평가 필드 포함", keys <= set(done["assessment"]), f"누락: {keys - set(done['assessment'])}")
 
-            roles = [m["role"] for m in a.get(f"/api/cases/{case_id}/messages").json()]
+            msgs = a.get(f"/api/cases/{case_id}/messages").json()
+            roles = [m["role"] for m in msgs]
             step("메시지 저장(안내·질문·답변)", roles == ["assistant", "user", "assistant"], f"roles={roles}")
             step("평가 이력 저장", len(a.get(f"/api/cases/{case_id}/assessments").json()) == 1, "평가가 1건이 아님")
+
+            # 답변 다시 생성: 사용자 메시지가 늘지 않고 같은 답변에 버전이 쌓여야 한다 (R010)
+            answer_id, greeting_id = msgs[-1]["id"], msgs[0]["id"]
+            regen = a.post(f"/api/cases/{case_id}/messages/{answer_id}/regenerate")
+            regen_events = _sse(regen.text)
+            step(
+                "답변 다시 생성(delta -> done)",
+                regen.status_code == 200 and any(e["type"] == "done" for e in regen_events)
+                and not any(e["type"] == "error" for e in regen_events),
+                f"{regen.status_code} {[e['type'] for e in regen_events][:4]}",
+            )
+            after = a.get(f"/api/cases/{case_id}/messages").json()
+            step(
+                "재생성 후 메시지 수 불변(사용자 질문 중복 없음)",
+                [m["role"] for m in after] == roles, f"roles={[m['role'] for m in after]}",
+            )
+            step(
+                "재생성 버전이 같은 답변에 저장",
+                len(after[-1]["versions"]) == 2 and after[-1]["content"] == after[-1]["versions"][-1],
+                f"versions={len(after[-1]['versions'])}",
+            )
+            step(
+                "안내 메시지·타인 요청은 재생성 거부",
+                a.post(f"/api/cases/{case_id}/messages/{greeting_id}/regenerate").status_code in (400, 409)
+                and b.post(f"/api/cases/{case_id}/messages/{answer_id}/regenerate").status_code == 404,
+                "거부되지 않음",
+            )
 
             payload = b"%PDF-1.4 check"
             up = a.post(f"/api/cases/{case_id}/attachments", files={"file": ("증거.pdf", payload, "application/pdf")})

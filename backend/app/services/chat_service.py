@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from anthropic import Anthropic
+from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from ..config import settings
@@ -25,6 +26,7 @@ HISTORY_LIMIT = 12  # Claude에 보내는 최근 메시지 수
 ANSWER_MAX_TOKENS = 1400
 DEFAULT_TITLE = "새 상담"
 TITLE_MAX_CHARS = 28
+MAX_ANSWER_VERSIONS = 10  # 한 답변을 다시 생성해 쌓을 수 있는 최대 버전 수(호출 비용 방지)
 
 
 def sse(payload: dict[str, Any]) -> str:
@@ -42,6 +44,8 @@ class ChatTurn:
     masked: str
     demo_assessment: DemoAssessment
     prior: list[Message]
+    # 값이 있으면 새 메시지를 만들지 않고 이 답변 메시지에 새 버전을 누적한다.
+    regenerate_message_id: int | None = None
 
 
 @dataclass
@@ -98,6 +102,67 @@ def start_turn(session: Session, case: Case, content: str) -> ChatTurn:
         masked=masked,
         demo_assessment=demo_assessment,
         prior=prior,
+    )
+
+
+def _load_versions(raw: str | None) -> list[str]:
+    try:
+        value = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        return []
+    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+
+
+def start_regeneration(session: Session, case: Case, message_id: int) -> ChatTurn:
+    """마지막 답변을 다시 생성할 준비를 한다. 사용자 메시지는 새로 만들지 않는다.
+
+    규칙(어기면 HTTPException): 이 상담의 답변 메시지여야 하고, 상담의 **마지막** 메시지여야 하며,
+    바로 앞에 사용자 질문이 있어야 하고, 버전 수가 한도 미만이어야 한다.
+    """
+    reply = session.get(Message, message_id)
+
+    if reply is None or reply.case_id != case.id or reply.role != "assistant":
+        raise HTTPException(status_code=404, detail="답변을 찾을 수 없습니다.")
+
+    messages = list(
+        session.exec(
+            select(Message)
+            .where(Message.case_id == case.id)
+            .order_by(Message.id)  # type: ignore[arg-type]
+        )
+    )
+
+    if messages[-1].id != reply.id:
+        raise HTTPException(
+            status_code=409,
+            detail="가장 최근 답변만 다시 생성할 수 있습니다.",
+        )
+
+    prior = [m for m in messages if m.id is not None and m.id < (reply.id or 0)]
+
+    if not prior or prior[-1].role != "user":
+        raise HTTPException(
+            status_code=400,
+            detail="다시 생성할 질문이 없는 답변입니다.",
+        )
+
+    if len(_load_versions(reply.versions)) >= MAX_ANSWER_VERSIONS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"답변은 최대 {MAX_ANSWER_VERSIONS}번까지 다시 생성할 수 있습니다.",
+        )
+
+    original = prior[-1].content
+    masked = mask_pii(original)
+
+    return ChatTurn(
+        case_id=case.id or 0,
+        owner_id=case.owner_id,
+        original=original,
+        masked=masked,
+        demo_assessment=assess(masked),
+        prior=prior,
+        regenerate_message_id=reply.id,
     )
 
 
@@ -184,7 +249,21 @@ def _save_result(turn: ChatTurn, run: _Run) -> bool:
         case.category = run.assessment.category
         case.based_law = based_law
 
-        reply = Message(case_id=turn.case_id, role="assistant", content=final)
+        if turn.regenerate_message_id is None:
+            reply = Message(case_id=turn.case_id, role="assistant", content=final)
+        else:
+            reply = session.get(Message, turn.regenerate_message_id)
+
+            if reply is None or reply.case_id != turn.case_id:
+                return False
+
+            # 첫 재생성이면 원래 답변이 1번째 버전이 된다. content는 항상 최신 버전.
+            versions = _load_versions(reply.versions) or [reply.content]
+            versions.append(final)
+            reply.versions = json.dumps(versions, ensure_ascii=False)
+            reply.content = final
+            case.updated_at = now_iso()
+
         session.add(case)
         session.add(reply)
         session.commit()
@@ -231,6 +310,7 @@ def stream_events(turn: ChatTurn) -> Iterator[str]:
                 "type": "done",
                 "assessment": {
                     **run.assessment.__dict__,
+                    "message_id": turn.regenerate_message_id,
                     "based_law": run.based_law,
                     "citations": [c.model_dump() for c in run.citations],
                 },

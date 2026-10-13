@@ -134,6 +134,10 @@ class Message(SQLModel, table=True):
     role: str
     content: str
 
+    # 답변을 다시 생성할 때 쌓이는 모든 버전(JSON 문자열 리스트, 오래된 것부터).
+    # 비어 있으면("[]") 버전이 하나뿐이다. content는 항상 최신 버전과 같다.
+    versions: str = "[]"
+
     created_at: str = Field(
         default_factory=now_iso,
     )

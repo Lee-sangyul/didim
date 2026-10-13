@@ -41,6 +41,7 @@
 **데이터베이스**
 - 로컬 기본값은 SQLite지만 운영은 **Postgres**다. SQLite는 외래키를 강제하지 않아서, 로컬에서 되던 삭제가 운영에서 500이 났다(R002). 삭제·삽입 순서를 외래키 순서로 지킨다.
 - `alembic`은 `.env`의 `DATABASE_URL`을 그대로 쓴다 → **그냥 실행하면 운영 DB를 건드린다.** 반드시 `DATABASE_URL`을 임시 DB로 덮어쓰고 실행한다. 마이그레이션 체인은 Postgres 전용이라 빈 SQLite에서는 실패한다(정상).
+- **배포 순서: 운영 DB에 `alembic upgrade head`를 먼저, 코드는 그 다음.** 새 코드가 새 컬럼을 조회하는데 운영 DB에 컬럼이 없으면 조회가 깨진다(R003, R016).
 - 모델(`backend/app/models.py`)을 바꾸면 **같은 작업에서** alembic revision을 만든다. 서버 시작 시의 컬럼 보충(`init_sqlite_schema`)은 SQLite 전용이다(R003). `scripts/check.py`의 `migrate` 단계가 모델-마이그레이션 불일치를 잡는다.
 - 법령 검색 DB(`data/legal/legal.db`)는 메인 DB와 **별개의 SQLite 파일**이고 git에 없다. `python -m app.legal.ingest --from-json`(`backend/`에서)으로 `articles.json`에서 복원한다. 없으면 근거 조문이 오류 없이 사라진다(R004). FTS5는 SQLite 전용이라 Postgres 이관 시 대안이 필요하다(R012).
 
