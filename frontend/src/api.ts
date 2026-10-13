@@ -44,14 +44,18 @@ export interface AssessmentRecord {
 
 export class ApiError extends Error {
   status: number;
+  /** 429(요청 제한)일 때 다시 시도할 수 있기까지의 초 */
+  retryAfter?: number;
 
   constructor(
     message: string,
     status: number,
+    retryAfter?: number,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -70,9 +74,18 @@ async function apiFetch(
 
   if (!response.ok) {
     let message = "요청을 처리하지 못했습니다.";
+    let retryAfter: number | undefined;
 
     try {
       const data = await response.json();
+
+      if (
+        typeof data === "object"
+        && data !== null
+        && typeof data.retry_after === "number"
+      ) {
+        retryAfter = data.retry_after;
+      }
 
       if (
         typeof data === "object"
@@ -89,6 +102,7 @@ async function apiFetch(
     throw new ApiError(
       message,
       response.status,
+      retryAfter,
     );
   }
 

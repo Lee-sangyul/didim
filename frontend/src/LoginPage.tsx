@@ -1,5 +1,6 @@
 import {
     FormEvent,
+    useEffect,
     useState,
 } from "react";
 
@@ -11,6 +12,14 @@ import {
 import type {
     AuthUser,
 } from "./api";
+
+import {
+    clearFailures,
+    formatCountdown,
+    lockRemainingMs,
+    recordFailure,
+    recordServerLock,
+} from "./loginGuard";
 
 
 interface LoginPageProps {
@@ -27,6 +36,20 @@ export default function LoginPage({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
+    // 이 아이디가 잠겨 있으면 해제까지 남은 시간(ms). 0이면 잠기지 않음.
+    const [lockedMs, setLockedMs] = useState(0);
+
+    // 아이디가 바뀌거나 잠금이 진행 중이면 1초마다 남은 시간을 갱신한다
+    useEffect(() => {
+        const refresh = () => setLockedMs(lockRemainingMs(username));
+        refresh();
+
+        const timer = window.setInterval(refresh, 1000);
+        return () => window.clearInterval(timer);
+    }, [username]);
+
+    const locked = lockedMs > 0;
+
 
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>,
@@ -37,6 +60,7 @@ export default function LoginPage({
             !username.trim()
             || !password
             || loading
+            || lockRemainingMs(username) > 0 // 잠긴 동안에는 서버에 요청하지 않는다
         ) {
             return;
         }
@@ -50,11 +74,28 @@ export default function LoginPage({
                 password,
             );
 
+            clearFailures(username);
             onLoggedIn(result.user);
 
         } catch (caughtError) {
             if (caughtError instanceof ApiError) {
-                setError(caughtError.message);
+                if (caughtError.status === 429) {
+                    recordServerLock(
+                        username,
+                        caughtError.retryAfter ?? 15 * 60,
+                    );
+                    setError("");
+                } else if (caughtError.status === 401) {
+                    const { left } = recordFailure(username);
+                    setError(
+                        left > 0
+                            ? `${caughtError.message} (남은 시도 ${left}회)`
+                            : caughtError.message,
+                    );
+                } else {
+                    setError(caughtError.message);
+                }
+                setLockedMs(lockRemainingMs(username));
             } else {
                 setError(
                     "로그인 중 오류가 발생했습니다.",
@@ -134,7 +175,17 @@ export default function LoginPage({
                         />
                     </label>
 
-                    {error && (
+                    {locked && (
+                        <div
+                            className="login-error"
+                            role="alert"
+                        >
+                            로그인 시도가 너무 많아 잠겼습니다.
+                            {" "}{formatCountdown(lockedMs)} 후에 다시 시도해 주세요.
+                        </div>
+                    )}
+
+                    {!locked && error && (
                         <div
                             className="login-error"
                             role="alert"
@@ -148,6 +199,7 @@ export default function LoginPage({
                         className="login-submit"
                         disabled={
                             loading
+                            || locked
                             || !username.trim()
                             || !password
                         }
