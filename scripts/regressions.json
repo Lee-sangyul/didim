@@ -204,6 +204,30 @@
       "fix": "배포 절차에 '1) alembic upgrade head(운영 DB) 2) 코드 배포' 순서를 명시. 자동화 전까지 릴리스 체크리스트로 관리",
       "check": null,
       "refs": "R003, backend/migrations/versions/c4d5e6f7a8b9_add_message_versions.py"
+    },
+    {
+      "id": "R017",
+      "title": "가입 증빙 문서가 삭제 예정일이 지나도 삭제되지 않음",
+      "area": "security",
+      "status": "open",
+      "severity": "major",
+      "symptom": "재직증명서 등 민감 문서가 Supabase Storage에 무기한 남음. 신청 시 30일 후 삭제 예정 시각만 기록됨(document_delete_after)",
+      "root_cause": "삭제 작업(스케줄러·관리 명령)이 없고, 승인·거절 처리에서도 문서를 지우지 않음. deleted_at 컬럼은 어디에서도 설정되지 않음",
+      "fix": "승인/거절 시점 또는 정기 작업에서 Storage 파일을 삭제하고 deleted_at을 기록. 보관 기간 정책은 사람이 정한다",
+      "check": "r017_registration_documents_get_deleted",
+      "refs": "backend/app/routers/registration.py, admin_registration.py, services/storage_service.py, README 개인정보 절"
+    },
+    {
+      "id": "R018",
+      "title": "로그인 시도 횟수 제한이 없음",
+      "area": "security",
+      "status": "open",
+      "severity": "major",
+      "symptom": "비밀번호 무차별 대입을 막는 장치가 없음(상담 내용·교원 개인정보 접근 계정)",
+      "root_cause": "로그인 엔드포인트에 시도 제한·잠금·지연이 구현되지 않음",
+      "fix": "계정·IP 단위 실패 횟수 제한과 일정 시간 잠금(DB 또는 프록시 레벨). 운영 환경이 리버스 프록시 뒤라면 그쪽 제한도 검토",
+      "check": "r018_login_rate_limited",
+      "refs": "backend/app/routers/auth.py, services/auth_service.py"
     }
   ]
 }

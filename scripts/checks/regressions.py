@@ -228,6 +228,23 @@ def r015_no_inline_styles():
     return n == 0, f"인라인 style {n}곳, CSS 규칙 없이 허용 중인 클래스: {allow}"
 
 
+def r017_registration_documents_get_deleted():
+    hits = []
+    for path in (BACKEND / "app").rglob("*.py"):
+        if path.name == "models.py":
+            continue
+        text = _read(path)
+        if re.search(r"deleted_at\s*=(?!=)", text) and "delete_registration_document" in text:
+            hits.append(path.name)
+    return bool(hits), f"삭제 처리 코드: {hits}" if hits else "문서를 삭제하고 deleted_at을 기록하는 코드가 없음"
+
+
+def r018_login_rate_limited():
+    pattern = re.compile(r"rate.?limit|lockout|too many|failed_attempt|throttle|slowapi|login_attempt", re.I)
+    hits = [p.name for p in (BACKEND / "app").rglob("*.py") if pattern.search(_read(p))]
+    return bool(hits), f"관련 코드: {hits}" if hits else "시도 제한 관련 코드가 없음"
+
+
 # ------------------------------------------------------------------ 실행
 def run_all() -> list[Result]:
     cases = json.loads(REGISTRY.read_text("utf-8"))["cases"]
