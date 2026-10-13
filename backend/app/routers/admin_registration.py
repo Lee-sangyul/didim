@@ -22,6 +22,7 @@ from ..services.storage_service import (
     StorageOperationError,
     download_registration_document,
 )
+from ..services.retention import deadline_iso_from
 from .auth import CurrentUserDependency
 
 
@@ -277,6 +278,7 @@ def approve_registration_application(
     application.rejection_reason = None
     application.reviewed_by = current_user.id
     application.reviewed_at = reviewed_at
+    application.document_delete_after = deadline_iso_from(reviewed_at)
     application.updated_at = reviewed_at
 
     try:
@@ -347,6 +349,7 @@ def reject_registration_application(
     application.rejection_reason = rejection_reason
     application.reviewed_by = current_user.id
     application.reviewed_at = reviewed_at
+    application.document_delete_after = deadline_iso_from(reviewed_at)
     application.updated_at = reviewed_at
 
     try:

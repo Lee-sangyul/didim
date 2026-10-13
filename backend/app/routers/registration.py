@@ -1,6 +1,6 @@
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -23,6 +23,7 @@ from ..models import (
     User,
 )
 from ..security.password import hash_password
+from ..services.retention import retention_deadline
 from ..services.storage_service import (
     StorageOperationError,
     delete_registration_document,
@@ -204,9 +205,9 @@ async def create_registration_application(
         .name
     )
 
-    delete_after = (
+    # 심사 전에는 신청 시점 기준 상한. 승인·거절 시 심사 시점 기준으로 다시 계산한다.
+    delete_after = retention_deadline(
         datetime.now(timezone.utc)
-        + timedelta(days=30)
     ).isoformat()
 
     application = RegistrationApplication(
