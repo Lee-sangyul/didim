@@ -9,21 +9,16 @@ from anthropic import Anthropic
 
 JSON_DIR = Path(__file__).resolve().parents[2] / "json"
 
+# 근거 법령(based_law)은 LLM이 쓰지 않는다. 법조문은 app.legal이 DB 원문으로 붙인다.
 OUTPUT_TEMPLATE = {
     "risk_level": 0,
     "countermeasures": "",
-    "based_law": ["clauses 1: ", "clauses 2: ", "clauses 3: "],
 }
 
 
 @lru_cache(maxsize=1)
 def _program_config_text() -> str:
     return (JSON_DIR / "program_config.json").read_text(encoding="utf-8")
-
-
-@lru_cache(maxsize=1)
-def _laws_text() -> str:
-    return (JSON_DIR / "laws.json").read_text(encoding="utf-8")
 
 
 def build_system_blocks() -> list[dict[str, Any]]:
@@ -34,16 +29,6 @@ def build_system_blocks() -> list[dict[str, Any]]:
                 "당신은 디딤(DIDIM)의 위험도 평가 엔진입니다. 아래 program_config.json에 정의된 역할, "
                 "허용된 행동, 금지된 행동, 데이터 정책을 반드시 지키세요.\n\n" + _program_config_text()
             ),
-        },
-        {
-            # 법령 데이터는 매 요청 동일하므로 프롬프트 캐싱으로 반복 호출 비용을 낮춘다.
-            "type": "text",
-            "text": (
-                "아래는 참고 가능한 법령 데이터베이스(laws.json) 전체입니다. "
-                "반드시 이 목록에 실제로 존재하는 조문만 근거로 사용하고, 존재하지 않는 법령·조항을 지어내지 마세요.\n\n"
-                + _laws_text()
-            ),
-            "cache_control": {"type": "ephemeral"},
         },
         {
             "type": "text",
@@ -111,5 +96,4 @@ def assess_with_claude(client: Anthropic, model: str, original_prompt: str, last
     data = json.loads(_strip_code_fence(raw))
     risk_level = max(0, min(100, int(data["risk_level"])))
     countermeasures = str(data.get("countermeasures", "")).strip()
-    based_law = [str(item) for item in data.get("based_law", [])]
-    return {"risk_level": risk_level, "countermeasures": countermeasures, "based_law": based_law}
+    return {"risk_level": risk_level, "countermeasures": countermeasures}
