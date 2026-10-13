@@ -53,10 +53,16 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
         page = context.new_page()
         # 로그인 전 세션 확인(/api/auth/me)과 잘못된 비밀번호는 401이 정상이다.
         # 브라우저는 모든 4xx를 콘솔 오류로 찍으므로, 네트워크 오류는 응답 이벤트로만 판단한다.
+        # 잠금 단계에서는 로그인이 429를 돌려주는 것이 정상이다.
         expected_401 = ("/api/auth/me", "/api/auth/login")
 
+        def is_expected(r) -> bool:
+            if r.status == 401:
+                return any(p in r.url for p in expected_401)
+            return r.status == 429 and "/api/auth/login" in r.url
+
         def on_response(r):
-            if r.status >= 500 or (r.status >= 400 and not (r.status == 401 and any(p in r.url for p in expected_401))):
+            if r.status >= 500 or (r.status >= 400 and not is_expected(r)):
                 problems.append(f"HTTP {r.status} {r.request.method} {r.url[:100]}")
 
         page.on("console", lambda m: problems.append(f"console.error: {m.text[:160]}")
@@ -85,7 +91,26 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
 
         step("잘못된 비밀번호는 오류 표시", bad_login)
 
+        # ---- 무차별 대입 방지(R018): 반복 실패하면 화면이 미리 잠그고, 새로고침해도 유지된다
+        def lockout_ui():
+            probe = "lockout_probe"
+            page.locator("input[autocomplete=username]").fill(probe)
+            for _ in range(5):
+                page.locator("input[autocomplete=current-password]").fill("wrong-password-123")
+                with page.expect_response(lambda r: "/api/auth/login" in r.url):
+                    page.locator("button.login-submit").click()
+            expect(page.locator(".login-error")).to_contain_text("잠겼습니다")
+            expect(page.locator("button.login-submit")).to_be_disabled()
+
+            page.reload()
+            page.locator("input[autocomplete=username]").fill(probe)
+            page.locator("input[autocomplete=current-password]").fill("wrong-password-123")
+            expect(page.locator("button.login-submit")).to_be_disabled()  # 새로고침 후에도 잠금 유지
+
+        step("로그인 5회 실패 시 화면이 잠기고 새로고침 후에도 유지", lockout_ui)
+
         def good_login():
+            page.locator("input[autocomplete=username]").fill(username)
             page.locator("input[autocomplete=current-password]").fill(password)
             page.locator("button.login-submit").click()
             expect(page.locator("button.new")).to_be_visible()

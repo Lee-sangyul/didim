@@ -343,6 +343,18 @@ def stage_frontend(ctx: Ctx) -> list[Result]:
     code, out = _build_frontend(ctx, dist)
     r.append(Result("vite build", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 15)))
     if code == 0:
+        # frontend/dist는 git에 두는 산출물이므로 소스와 어긋나면 배포 화면이 옛 버전이 된다
+        def refs_of(path: Path) -> set[str]:
+            text = path.read_text("utf-8") if path.exists() else ""
+            return set(re.findall(r"""(?:src|href)=["']/assets/([^"']+)""", text))
+
+        built, committed = refs_of(dist / "index.html"), refs_of(FRONTEND / "dist" / "index.html")
+        fresh = built == committed
+        r.append(Result(
+            "커밋된 frontend/dist가 현재 소스와 일치", PASS if fresh else WARN,
+            "" if fresh else "릴리스 전에 `cd frontend && npm run build` 후 dist를 커밋하세요 (배포 화면이 옛 버전입니다)",
+        ))
+
         index = (dist / "index.html").read_text("utf-8") if (dist / "index.html").exists() else ""
         refs = re.findall(r"""(?:src|href)=["']/(assets/[^"']+)""", index)
         missing = [x for x in refs if not (dist / x).exists()]

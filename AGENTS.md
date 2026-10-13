@@ -28,6 +28,7 @@
 ## 2. 사람의 승인이 필요한 일 (임의로 하지 말고 물어볼 것)
 
 - 운영 DB 변경(마이그레이션 적용 포함), 계정 생성·삭제·비밀번호 변경
+- 증빙 문서 보관 기간 변경, 삭제 작업 실행, 로그인 제한 한도 변경
 - 수집 대상 법령 추가·삭제 (`backend/app/legal/config.py`의 `TARGET_LAWS`) 및 `articles.json` 재수집
 - `expected_articles` 값 입력, 검색 방식 변경(임베딩 도입 등)
 - 의존성 추가·버전 변경, 새 UI 라이브러리 (테스트 전용 `backend/requirements-dev.txt`의 Playwright는 승인된 상태)
@@ -43,7 +44,9 @@
 - `alembic`은 `.env`의 `DATABASE_URL`을 그대로 쓴다 → **그냥 실행하면 운영 DB를 건드린다.** 반드시 `DATABASE_URL`을 임시 DB로 덮어쓰고 실행한다. 마이그레이션 체인은 Postgres 전용이라 빈 SQLite에서는 실패한다(정상).
 - **배포 순서: 운영 DB에 `alembic upgrade head`를 먼저, 코드는 그 다음.** 새 코드가 새 컬럼을 조회하는데 운영 DB에 컬럼이 없으면 조회가 깨진다(R003, R016).
 - 모델(`backend/app/models.py`)을 바꾸면 **같은 작업에서** alembic revision을 만든다. 서버 시작 시의 컬럼 보충(`init_sqlite_schema`)은 SQLite 전용이다(R003). `scripts/check.py`의 `migrate` 단계가 모델-마이그레이션 불일치를 잡는다.
-- 법령 검색 DB(`data/legal/legal.db`)는 메인 DB와 **별개의 SQLite 파일**이고 git에 없다. `python -m app.legal.ingest --from-json`(`backend/`에서)으로 `articles.json`에서 복원한다. 없으면 근거 조문이 오류 없이 사라진다(R004). FTS5는 SQLite 전용이라 Postgres 이관 시 대안이 필요하다(R012).
+- 법령 검색 DB(`data/legal/legal.db`)는 메인 DB와 **별개의 SQLite 파일**이고 git에 없다. **`data/legal/articles.json`만 배포하면** 서버가 시작할 때 `backend/app/legal/bootstrap.py`가 DB를 만든다(없거나 내용이 다르면 교체). 상태는 `/api/health/legal`. 수동 복원은 `python -m app.legal.ingest --from-json`(`backend/`에서). 이 방식을 유지하기로 결정했으므로 법령 검색을 Postgres로 옮기지 않는다(R004, R012).
+- 가입 증빙 문서는 심사 후 **5년** 보관한다(`backend/app/services/retention.py`). 삭제는 `python -m scripts.purge_registration_documents`(`backend/`에서)로 하며 서버가 자동으로 부르지 않는다. 보관 기간·삭제 대상은 개인정보 정책이므로 임의로 바꾸거나 실행하지 않는다(R017).
+- 로그인은 아이디 5회·IP 20회 실패/15분 제한이 있다(`backend/app/services/login_guard.py`). 한도는 브라우저의 `frontend/src/loginGuard.ts`와 같아야 한다(R019). 테스트에서 같은 아이디로 잘못된 로그인을 반복하면 잠기므로 점검용 계정을 따로 쓴다.
 
 **외부 연동**
 - 법제처 응답의 상세 링크에 인증키(OC)가 섞여 있다. 응답을 저장·로그·fixture로 쓸 때 반드시 치환한다(`ingest._scrub`, R005).
@@ -57,8 +60,8 @@
 
 **프런트엔드**
 - 채팅은 SSE(`delta` → `done` | `error`)다. 이벤트 모양을 바꾸면 `frontend/src/api.ts`의 `streamChat`과 함께 고친다.
-- `frontend/dist`와 `frontend/tsconfig.tsbuildinfo`는 **git에 추적된다.** `npm run build`(= `tsc -b && vite build`)는 이 파일들을 바꿔 버린다. 의도하지 않았다면 커밋하지 말고 되돌린다. 빌드 확인은 `python scripts/check.py --only frontend`가 임시 위치에서 한다.
-- 새 파일에 스타일을 넣을 때 `frontend/src/styles/*.css`와 디자인 토큰(`tokens.css`의 `var(--...)`)을 쓴다. 인라인 `style={{}}`·하드코딩 색은 다크 모드에서 깨진다(R015). className을 쓰면 CSS 규칙도 반드시 만든다(R006).
+- `frontend/dist`와 `frontend/tsconfig.tsbuildinfo`는 **git에 추적된다**(배포 화면이 이 폴더다). 개발 중에는 `npm run build`가 이 파일들을 바꾸므로 커밋하지 말고 되돌린다. **릴리스 직전에만** `dist`를 지우고 다시 빌드해 커밋한다(R011). 빌드 확인은 `python scripts/check.py --only frontend`가 임시 위치에서 한다.
+- 스타일은 `frontend/src/styles/*.css`와 디자인 토큰(`tokens.css`의 `var(--...)`)으로만 쓴다. 인라인 `style={{}}`은 금지(데이터로 계산되는 게이지 너비만 예외), 하드코딩 색도 다크 모드에서 깨진다(R015). className을 쓰면 CSS 규칙도 반드시 만든다(R006).
 - `frontend/src/App.tsx`는 매우 크고 여러 사람이 동시에 수정한다. 변경은 작게, 관련 없는 정리·포맷 변경은 하지 않는다.
 
 **환경**
@@ -77,6 +80,7 @@ backend/app/
   legal/             법령 수집(ingest)·파서·검색(retriever)·선택(selector)·서비스. 별도 SQLite
   spa.py             빌드된 프런트 서빙(배포용). 모든 라우터 뒤에서 호출
   risk.py, demo.py   위험도 평가(Claude) / 데모 모드 규칙
+  services/login_guard.py, retention.py   로그인 시도 제한 / 증빙 문서 보관·삭제
   models.py          메인 DB 모델
 backend/migrations/  alembic (Postgres 전용)
 backend/tests/       pytest. 외부 호출 없음
@@ -84,6 +88,7 @@ frontend/src/        React + TypeScript (Vite). styles/ 아래에 CSS 분리
 data/legal/          articles.json(커밋), legal.db(생성물, 미커밋), raw/(원본 응답, 키 치환됨)
 json/                위험도 평가 프롬프트 설정(program_config.json 등)
 scripts/             check.py(릴리스 점검), regressions.json(결함 목록)
+TODO.md              사람의 결정·확인을 기다리는 일 (작업 전에 읽는다)
 test_didim.py        기존 API 테스트(수정하지 말고 호출만; 추후 병합 예정)
 ```
 

@@ -156,6 +156,24 @@ def run_scenario(label: str) -> list[Result]:
             a.post("/api/auth/logout")
             step("로그아웃 후 접근 차단", a.get("/api/cases").status_code == 401, "여전히 접근 가능")
 
+            # 무차별 대입 방지(R018): 반복 실패 -> 429, 잠긴 동안은 올바른 비밀번호도 거부, 다른 아이디는 영향 없음
+            codes = [
+                anon.post("/api/auth/login", json={"username": other, "password": "wrong-password"}).status_code
+                for _ in range(5)
+            ]
+            step("반복 실패 시 로그인 잠금(429)", codes[:4] == [401] * 4 and codes[4] == 429, f"codes={codes}")
+            locked = anon.post("/api/auth/login", json={"username": other, "password": PASSWORD})
+            step(
+                "잠긴 동안 올바른 비밀번호도 거부, Retry-After 제공",
+                locked.status_code == 429 and int(locked.headers.get("retry-after", "0")) > 0,
+                f"{locked.status_code} retry-after={locked.headers.get('retry-after')}",
+            )
+            step(
+                "다른 아이디는 잠기지 않음",
+                anon.post("/api/auth/login", json={"username": owner, "password": PASSWORD}).status_code == 200,
+                "다른 계정까지 잠김",
+            )
+
         # 점검 계정 정리 (Postgres 임시 DB여도 흔적을 남기지 않는다)
         with Session(engine) as s:
             s.execute(text("DELETE FROM auth_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN (:a,:b))"), {"a": owner, "b": other})
