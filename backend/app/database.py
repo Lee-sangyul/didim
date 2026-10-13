@@ -44,3 +44,36 @@ def get_session() -> Generator[Session, None, None]:
     """
     with Session(engine) as session:
         yield session
+
+def init_sqlite_schema() -> None:
+    """
+    SQLite 로컬 실행 시 테이블을 만들고, 이후 추가된 컬럼을 보충한다.
+
+    Postgres(운영)는 alembic 마이그레이션이 담당하므로 호출하지 않는다.
+    """
+    from sqlmodel import SQLModel
+
+    from . import models  # noqa: F401  (테이블 등록)
+
+    SQLModel.metadata.create_all(engine)
+
+    # (테이블, 컬럼, DDL) - alembic을 거치지 않는 기존 SQLite 파일을 위한 보충
+    added_columns = [
+        ("case", "based_law", "VARCHAR DEFAULT '[]'"),
+        ("assessment", "citations", "VARCHAR DEFAULT '[]'"),
+    ]
+
+    with engine.connect() as conn:
+        for table, column, ddl in added_columns:
+            existing = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    f'PRAGMA table_info("{table}")'
+                ).fetchall()
+            }
+
+            if column not in existing:
+                conn.exec_driver_sql(
+                    f'ALTER TABLE "{table}" ADD COLUMN {column} {ddl}'
+                )
+                conn.commit()
