@@ -1,6 +1,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -63,8 +64,7 @@ const emptyTitles = [
   "필요한 도움을 함께 찾아볼게요"
 ];
 
-const TEXTAREA_MIN = 46;
-const TEXTAREA_MAX = 92;
+const TEXTAREA_MAX_LINES = 5;
 
 function getRandomEmptyTitle() {
   return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
@@ -133,8 +133,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const [loading, setLoading] = useState(false);
   const [aside, setAside] = useState(true);
   const [error, setError] = useState("");
-  const [inputLines, setInputLines] = useState(1);
-  const [inputExpanded, setInputExpanded] = useState(false);
+  const [inputMultiline, setInputMultiline] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
@@ -327,16 +326,41 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   }, []);
 
   // ---------- 입력창 자동 높이 ----------
-  // 타이핑·음성 입력·전송 후 비우기 모두 input이 바뀌므로 여기서 한 번에 처리
-  useEffect(() => {
+  // 내용의 실제 줄 수(줄바꿈·자동 줄바꿈 포함)에 맞춰 1~TEXTAREA_MAX_LINES줄로 늘리고,
+  // 그보다 길면 스크롤한다. 타이핑·음성 입력·전송 후 비우기 모두 input이 바뀌므로 한 곳에서 처리.
+  const fitTextarea = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = `${TEXTAREA_MIN}px`;
-    const nextHeight = Math.min(el.scrollHeight, TEXTAREA_MAX);
-    el.style.height = `${nextHeight}px`;
-    el.style.overflowY = el.scrollHeight > TEXTAREA_MAX ? "auto" : "hidden";
-    setInputExpanded(nextHeight > TEXTAREA_MIN);
-  }, [input]);
+
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
+    el.style.height = `${lineHeight}px`; // 한 줄 높이로 줄여야 scrollHeight가 내용 높이를 정확히 반영한다
+    const contentLines = Math.max(1, Math.round(el.scrollHeight / lineHeight));
+    const lines = Math.min(contentLines, TEXTAREA_MAX_LINES);
+
+    el.style.height = `${lines * lineHeight}px`;
+    el.style.overflowY = contentLines > TEXTAREA_MAX_LINES ? "auto" : "hidden";
+    setInputMultiline(lines > 1);
+  }, []);
+
+  useEffect(() => {
+    fitTextarea();
+  }, [input, fitTextarea]);
+
+  // 창 크기·사이드 패널 토글로 너비가 바뀌면 자동 줄바꿈이 달라지므로 다시 맞춘다
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    let lastWidth = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth !== lastWidth) {
+        lastWidth = el.clientWidth;
+        fitTextarea();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitTextarea]);
 
   // ---------- 데이터 로딩 ----------
   async function loadAttachments(id: number) {
@@ -834,7 +858,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
           <input ref={fileInput} type="file" className="file-hidden" onChange={onUpload} />
 
           <form className="composer" onSubmit={send}>
-            <div className={`input input-lines-${Math.min(inputLines, 5)}`}>
+            <div className={`input${inputMultiline ? " multiline" : ""}`}>
               <button
                 type="button"
                 className="attach-btn"
@@ -856,6 +880,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                     send();
                   }
                 }}
+                rows={1}
                 placeholder={isListening ? "말씀해 주세요…" : "상황을 자세히 적어 주세요…"}
                 maxLength={8000}
               />

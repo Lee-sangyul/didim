@@ -39,31 +39,17 @@
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-/* 1줄일 때: 세로 완벽히 원모양(알약형) & 세로 중앙 정렬 */
-.input.input-lines-1 {
-  height: 52px;
+/* 1줄(기본): 알약형, 세로 중앙 정렬 */
+.input {
   min-height: 52px;
-  border-radius: 9999px !important;
+  border-radius: 26px !important; /* min-height의 절반 = 알약형. 9999px는 전환 애니메이션이 어색하다 */
   align-items: center;
   padding: 0 8px 0 10px;
 }
 
-/* 2~3줄일 때: 모서리 살짝 둥글게 되어있는 직사각형 */
-.input.input-lines-2,
-.input.input-lines-3 {
+/* 2줄 이상: 둥근 사각형. 높이는 textarea가 정하고 버튼은 아래쪽에 붙는다. */
+.input.multiline {
   border-radius: 14px !important;
-  min-height: 70px;
-  height: auto;
-  align-items: flex-end;
-  padding: 10px 8px 8px 10px;
-}
-
-/* 4줄 이상일 때: 모서리 살짝 둥글게 되어있는 직사각형 & 스크롤바 */
-.input.input-lines-4,
-.input.input-lines-5 {
-  border-radius: 14px !important;
-  min-height: 116px;
-  height: auto;
   align-items: flex-end;
   padding: 10px 8px 8px 10px;
 }
@@ -95,50 +81,18 @@
   color: var(--placeholder);
 }
 
-/* 1줄일 때 텍스트 영역: 세로 정중앙 정렬 */
-.input.input-lines-1 textarea {
-  height: 24px !important;
-  min-height: 24px !important;
-  max-height: 24px !important;
-  line-height: 24px;
+/* 높이와 overflow는 App.tsx의 fitTextarea()가 줄 수에 맞춰 인라인으로 지정한다. */
+.input textarea {
+  height: 24px;
+  min-height: 24px;
   padding: 0 84px 0 2px;
-  overflow: hidden !important;
-  align-self: center;
-}
-
-/* 2줄일 때 */
-.input.input-lines-2 textarea {
-  height: 48px !important;
-  min-height: 48px !important;
-  max-height: 48px !important;
-  line-height: 24px;
-  padding: 0 84px 0 2px;
-  overflow: hidden !important;
+  overflow-y: hidden;
   align-self: flex-start;
-}
-
-/* 3줄일 때 */
-.input.input-lines-3 textarea {
-  height: 72px !important;
-  min-height: 72px !important;
-  max-height: 72px !important;
-  line-height: 24px;
-  padding: 0 84px 0 2px;
-  overflow: hidden !important;
-  align-self: flex-start;
-}
-
-/* 4줄 이상일 때: 4줄 높이 고정 및 스크롤바 */
-.input.input-lines-4 textarea,
-.input.input-lines-5 textarea {
-  height: 96px !important;
-  min-height: 96px !important;
-  max-height: 96px !important;
-  line-height: 24px;
-  padding: 0 84px 0 2px;
-  overflow-y: auto !important;
   scrollbar-gutter: stable;
-  align-self: flex-start;
+}
+
+.input:not(.multiline) textarea {
+  align-self: center;
 }
 
 /* 스크롤바 디자인 */
@@ -194,17 +148,14 @@
 }
 
 /* 1줄일 때는 세로 중앙 */
-.input.input-lines-1 .input-actions {
+.input .input-actions {
   top: 50%;
   bottom: auto;
   transform: translateY(-50%);
 }
 
 /* 2줄 이상일 때는 하단 고정 */
-.input.input-lines-2 .input-actions,
-.input.input-lines-3 .input-actions,
-.input.input-lines-4 .input-actions,
-.input.input-lines-5 .input-actions {
+.input.multiline .input-actions {
   bottom: 8px;
   top: auto;
   transform: none;
@@ -242,14 +193,11 @@
   cursor: pointer;
 }
 
-.input.input-lines-1 .attach-btn {
+.input .attach-btn {
   align-self: center;
 }
 
-.input.input-lines-2 .attach-btn,
-.input.input-lines-3 .attach-btn,
-.input.input-lines-4 .attach-btn,
-.input.input-lines-5 .attach-btn {
+.input.multiline .attach-btn {
   align-self: flex-end;
   margin-bottom: 2px;
 }
@@ -324,19 +272,12 @@
     gap: 6px;
   }
 
-  .input.input-lines-1 {
-    height: 50px;
+  .input {
     min-height: 50px;
     padding: 0 6px 0 8px;
   }
 
-  .input.input-lines-2,
-  .input.input-lines-3 {
-    padding: 8px 6px 6px 8px;
-  }
-
-  .input.input-lines-4,
-  .input.input-lines-5 {
+  .input.multiline {
     padding: 8px 6px 6px 8px;
   }
 
@@ -373,11 +314,7 @@
     font-size: 15px;
   }
 
-  .input.input-lines-1 textarea,
-  .input.input-lines-2 textarea,
-  .input.input-lines-3 textarea,
-  .input.input-lines-4 textarea,
-  .input.input-lines-5 textarea {
+  .input textarea {
     padding-right: 76px;
     padding-left: 2px;
   }
@@ -388,16 +325,11 @@
     padding: 8px 10px max(10px, env(safe-area-inset-bottom));
   }
 
-  .input.input-lines-1 {
-    height: 48px;
+  .input {
     min-height: 48px;
   }
 
-  .input.input-lines-1 textarea,
-  .input.input-lines-2 textarea,
-  .input.input-lines-3 textarea,
-  .input.input-lines-4 textarea,
-  .input.input-lines-5 textarea {
+  .input textarea {
     padding-right: 72px;
     padding-left: 2px;
   }
@@ -416,8 +348,7 @@
     padding: 4px 10px max(4px, env(safe-area-inset-bottom));
   }
 
-  .input.input-lines-1 {
-    height: 42px;
+  .input {
     min-height: 42px;
   }
 
