@@ -151,8 +151,45 @@ def r009_min_length_consistent():
 
 
 def r010_regenerate_endpoint_exists():
-    found = [p.name for p in (BACKEND / "app" / "routers").glob("*.py") if "regenerate" in _read(p).lower()]
-    return bool(found), "전용 재생성 엔드포인트 있음" if found else "재생성 전용 엔드포인트 없음(/chat 재사용)"
+    """실제 동작으로 점검: 재생성해도 사용자 메시지가 늘지 않고 같은 답변에 버전이 쌓인다."""
+    import uuid
+
+    from fastapi.testclient import TestClient
+    from sqlmodel import Session, select
+
+    from app.database import engine
+    from app.main import app
+    from app.models import Case, Message, User
+    from app.routers.auth import get_current_user
+
+    with TestClient(app) as client:
+        with Session(engine) as s:
+            user = User(username=f"r010_{uuid.uuid4().hex[:6]}", password_hash="x", name="r010")
+            s.add(user)
+            s.commit()
+            s.refresh(user)
+            case = Case(owner_id=user.id)
+            s.add(case)
+            s.commit()
+            s.refresh(case)
+            uid, cid = user.id, case.id
+
+        app.dependency_overrides[get_current_user] = lambda: User(id=uid, username="x", password_hash="x", name="x")
+        try:
+            client.post(f"/api/cases/{cid}/chat", json={"content": "학부모가 반복해서 욕설을 합니다."})
+            with Session(engine) as s:
+                before = list(s.exec(select(Message).where(Message.case_id == cid).order_by(Message.id)))
+            answer = before[-1]
+            resp = client.post(f"/api/cases/{cid}/messages/{answer.id}/regenerate")
+            with Session(engine) as s:
+                after = list(s.exec(select(Message).where(Message.case_id == cid).order_by(Message.id)))
+        finally:
+            app.dependency_overrides.clear()
+
+    same_count = len(after) == len(before)
+    versions = len(json.loads(after[-1].versions or "[]"))
+    ok = resp.status_code == 200 and same_count and versions == 2
+    return ok, f"status={resp.status_code}, 메시지 {len(before)}->{len(after)}, 버전 {versions}"
 
 
 def r011_dist_has_no_stale_assets():
