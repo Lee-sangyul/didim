@@ -164,8 +164,10 @@ Windows에서는 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요.
 | `frontend/src/App.tsx` | 상담 화면과 인쇄용 보고서 |
 | `frontend/src/RegistrationPage.tsx` | 교직원 계정 신청 |
 | `frontend/src/AdminRegistrationPage.tsx` | 관리자 신청 심사 |
-| `backend/app/main.py` | 상담·메시지·첨부·위험도 API |
-| `backend/app/routers/` | 로그인 및 계정 발급 API |
+| `backend/app/main.py` | 앱 생성·라우터 등록·시작 시 초기화 |
+| `backend/app/routers/` | HTTP 엔드포인트: 로그인(`auth`), 계정 발급(`registration`, `admin_registration`), 상담(`cases`), 첨부(`attachments`), 채팅(`chat`) |
+| `backend/app/services/` | 업무 로직: 채팅 파이프라인(`chat_service`), 상담 조회·변환(`case_service`), 인증, 저장소 |
+| `backend/app/schemas/` | API 요청·응답 모델 |
 | `backend/app/legal/` | 법령 수집·검색·조문 선택 |
 | `backend/app/models.py` | 데이터 모델 |
 | `backend/migrations/` | 메인 DB 마이그레이션 |
