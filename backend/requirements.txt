@@ -7,7 +7,7 @@ python-multipart==0.0.20
 pytest==8.4.2
 httpx==0.28.1
 
-psycopg[binary]
-alembic
+psycopg[binary]==3.3.6
+alembic==1.20.0
 pwdlib[argon2]==0.3.1
 supabase==2.31.0
