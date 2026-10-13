@@ -266,6 +266,9 @@ def stage_server(ctx: Ctx) -> list[Result]:
             return r
 
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+        if (FRONTEND / "dist" / "index.html").exists():
+            code, body = _http(opener, "GET", f"{base}/")
+            r.append(Result("실서버가 프런트 화면(/)을 서빙", PASS if code == 200 and 'id="root"' in body else FAIL, f"{code}"))
         code, body = _http(opener, "GET", f"{base}/api/cases")
         r.append(Result("미로그인 /api/cases -> 401", PASS if code == 401 else FAIL, f"{code}"))
 

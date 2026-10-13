@@ -14,6 +14,7 @@ from .routers.attachments import (  # noqa: F401  (UPLOAD_DIR: 테스트가 사�
 from .routers.cases import router as cases_router
 from .routers.chat import router as chat_router
 from .routers.registration import router as registration_router
+from .spa import mount_frontend
 
 app = FastAPI(title="디딤 API", version="1.0.0")
 app.add_middleware(
@@ -52,3 +53,7 @@ def health() -> dict:
         "mode": "demo" if demo else "claude",
         "environment": settings.app_env,
     }
+
+
+# 모든 API 라우터 뒤에 등록해야 한다 (catch-all 라우트 포함)
+mount_frontend(app)

@@ -101,13 +101,13 @@
       "id": "R008",
       "title": "프런트 화면이 서빙되지 않음 (/ 가 404)",
       "area": "release",
-      "status": "open",
+      "status": "fixed",
       "severity": "blocker",
       "symptom": "launcher.py/배포 exe로 실행하면 브라우저에 화면 대신 JSON 404. 개발 시에는 Vite(5173)가 화면을 주므로 눈에 띄지 않음",
       "root_cause": "커밋 1a118d6에서 FRONTEND_DIST 정적 서빙(/assets 마운트, index.html 폴백)이 삭제됨",
-      "fix": "frontend/dist가 있으면 /assets 마운트와 SPA 폴백 라우트(단, /api 제외)를 main.py에 복구",
+      "fix": "backend/app/spa.py: frontend/dist가 있으면 /assets 마운트와 SPA 폴백을 등록(/api/* 미정의 경로는 404, dist 바깥 파일은 서빙 안 함). main.py 맨 끝에서 호출",
       "check": "r008_spa_served",
-      "refs": "1a118d6, backend/launcher.py"
+      "refs": "1a118d6(삭제), backend/app/spa.py, backend/tests/test_spa.py"
     },
     {
       "id": "R009",
