@@ -7,6 +7,9 @@
     python scripts/check.py --skip server    # 일부 단계 제외
     python scripts/check.py -v               # 성공 항목의 상세도 출력
 
+브라우저 E2E(`browser` 단계)는 Playwright가 필요하다: pip install -r backend/requirements-dev.txt
+(브라우저는 PC에 설치된 Chrome/Edge를 쓴다. 없으면 이 단계만 WARN으로 건너뛴다.)
+
 원칙
 - 외부 호출 없음: Claude, 법제처 API, Supabase를 호출하지 않는다 (키를 빈 값으로 덮어쓴 격리 환경).
 - 개발 데이터 보호: 모든 DB·업로드·법령 DB는 임시 폴더에서만 만들고 끝나면 지운다.
@@ -21,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
 import re
 import shutil
@@ -52,6 +56,7 @@ STAGES = [
     ("e2e", "API 시나리오(E2E)"),
     ("server", "서버 프로세스 기동 스모크"),
     ("frontend", "프런트 타입 검사·빌드"),
+    ("browser", "브라우저 E2E(Playwright)"),
     ("release", "릴리스 점검(보안·설정·배포물)"),
     ("regress", "회귀 사례(regressions.json)"),
 ]
@@ -112,6 +117,8 @@ def stage_env(ctx: Ctx) -> list[Result]:
             "" if has_pg else "없음: 마이그레이션·외래키를 실제 Postgres로 검증하지 못하고 SQLite로 대체됨",
         )
     )
+    pw_ok = run([py, "-c", "import playwright"], ROOT, ctx.env())[0] == 0
+    r.append(Result("Playwright(브라우저 E2E)", PASS if pw_ok else WARN, "" if pw_ok else "없음: pip install -r backend/requirements-dev.txt (브라우저 E2E 건너뜀)"))
     env_file = (ROOT / ".env").exists()
     r.append(Result(".env 존재", PASS if env_file else WARN, "" if env_file else ".env.example을 복사해 설정 필요"))
     return r
@@ -248,11 +255,12 @@ def _http(opener, method: str, url: str, body: dict | None = None):
         return e.code, e.read().decode("utf-8", "replace")
 
 
-def stage_server(ctx: Ctx) -> list[Result]:
-    r: list[Result] = []
+@contextlib.contextmanager
+def _server(ctx: Ctx, env: dict[str, str], name: str):
+    """실제 uvicorn 프로세스를 띄우고 (base_url | None, 로그 경로)를 준다. 끝나면 반드시 종료한다."""
     port = free_port()
-    env = ctx.env(DATABASE_URL=f"sqlite:///{(ctx.tmp / 'server.db').as_posix()}")
-    log = (ctx.tmp / "server.log").open("w")
+    log_path = ctx.tmp / f"{name}.log"
+    log = log_path.open("w")
     proc = subprocess.Popen(
         [python_exe(), "-m", "uvicorn", "app.main:app", "--app-dir", str(BACKEND),
          "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
@@ -260,9 +268,33 @@ def stage_server(ctx: Ctx) -> list[Result]:
     )
     base = f"http://127.0.0.1:{port}"
     try:
-        up = wait_http(f"{base}/api/health", 25)
-        r.append(Result("서버 프로세스 기동(/api/health)", PASS if up else FAIL, "" if up else "25초 안에 응답 없음\n" + tail((ctx.tmp / "server.log").read_text(errors="replace"), 10)))
-        if not up:
+        yield (base if wait_http(f"{base}/api/health", 25) else None), log_path
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        log.close()
+
+
+def _seed_user(env: dict[str, str], username: str, password: str) -> tuple[int, str]:
+    """서버가 만든 스키마에 점검용 계정을 직접 넣는다 (가입 승인 흐름은 test_didim.py가 담당)."""
+    seed = (
+        "import sys;from sqlmodel import Session;from app.database import engine;"
+        "from app.models import User;from app.security.password import hash_password;"
+        "s=Session(engine);s.add(User(username=sys.argv[1],password_hash=hash_password(sys.argv[2]),name='점검'));s.commit()"
+    )
+    return run([python_exe(), "-c", seed, username, password], BACKEND, env)
+
+
+def stage_server(ctx: Ctx) -> list[Result]:
+    r: list[Result] = []
+    env = ctx.env(DATABASE_URL=f"sqlite:///{(ctx.tmp / 'server.db').as_posix()}")
+
+    with _server(ctx, env, "server") as (base, log_path):
+        r.append(Result("서버 프로세스 기동(/api/health)", PASS if base else FAIL, "" if base else "25초 안에 응답 없음\n" + tail(log_path.read_text(errors="replace"), 10)))
+        if not base:
             return r
 
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
@@ -272,13 +304,7 @@ def stage_server(ctx: Ctx) -> list[Result]:
         code, body = _http(opener, "GET", f"{base}/api/cases")
         r.append(Result("미로그인 /api/cases -> 401", PASS if code == 401 else FAIL, f"{code}"))
 
-        # 서버가 만든 스키마에 점검용 계정을 직접 넣는다 (가입 승인 흐름은 test_didim.py가 담당)
-        seed = (
-            "from sqlmodel import Session;from app.database import engine;"
-            "from app.models import User;from app.security.password import hash_password;"
-            "s=Session(engine);s.add(User(username='srv_check',password_hash=hash_password('check-only-pw-1234'),name='점검'));s.commit()"
-        )
-        code, out = run([python_exe(), "-c", seed], BACKEND, env)
+        code, out = _seed_user(env, "srv_check", "check-only-pw-1234")
         if code != 0:
             r.append(Result("점검용 계정 생성", FAIL, tail(out, 6)))
             return r
@@ -294,14 +320,12 @@ def stage_server(ctx: Ctx) -> list[Result]:
             code, body = _http(opener, "POST", f"{base}/api/cases/{case_id}/chat", {"content": "학부모가 반복해서 욕설을 합니다."})
             kinds = [json.loads(b[6:])["type"] for b in body.split("\n\n") if b.startswith("data: ")]
             r.append(Result("실서버 채팅 스트리밍", PASS if code == 200 and "done" in kinds and "error" not in kinds else FAIL, f"{code} {kinds[:3]}..."))
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        log.close()
     return r
+
+
+def _build_frontend(ctx: Ctx, dist: Path) -> tuple[int, str]:
+    npx = shutil.which("npx") or "npx"
+    return run([npx, "--no-install", "vite", "build", "--outDir", str(dist), "--emptyOutDir"], FRONTEND, ctx.env(), timeout=300)
 
 
 def stage_frontend(ctx: Ctx) -> list[Result]:
@@ -316,7 +340,7 @@ def stage_frontend(ctx: Ctx) -> list[Result]:
     r.append(Result("tsc 타입 검사", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 15)))
 
     dist = ctx.tmp / "dist"
-    code, out = run([npx, "--no-install", "vite", "build", "--outDir", str(dist), "--emptyOutDir"], FRONTEND, env, timeout=300)
+    code, out = _build_frontend(ctx, dist)
     r.append(Result("vite build", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 15)))
     if code == 0:
         index = (dist / "index.html").read_text("utf-8") if (dist / "index.html").exists() else ""
@@ -325,6 +349,32 @@ def stage_frontend(ctx: Ctx) -> list[Result]:
         ok = bool(refs) and not missing
         r.append(Result("빌드 산출물(index.html 참조 파일 존재)", PASS if ok else FAIL, f"참조 {len(refs)}개, 누락 {missing}"))
     return r
+
+
+def stage_browser(ctx: Ctx) -> list[Result]:
+    code, _ = run([python_exe(), "-c", "import playwright"], ROOT, ctx.env())
+    if code != 0:
+        return [Result("Playwright 설치", WARN, "설치되지 않아 브라우저 E2E를 건너뜀: pip install -r backend/requirements-dev.txt")]
+
+    dist = ctx.tmp / "dist"
+    if not (dist / "index.html").exists():  # frontend 단계를 건너뛴 경우
+        code, out = _build_frontend(ctx, dist)
+        if code != 0:
+            return [Result("브라우저 E2E용 프런트 빌드", FAIL, tail(out, 12))]
+
+    env = ctx.env(
+        DATABASE_URL=f"sqlite:///{(ctx.tmp / 'browser.db').as_posix()}",
+        FRONTEND_DIST=str(dist),
+    )
+    user, pw = "e2e_check", "check-only-pw-1234"
+
+    with _server(ctx, env, "browser") as (base, log_path):
+        if not base:
+            return [Result("브라우저 E2E용 서버 기동", FAIL, tail(log_path.read_text(errors="replace"), 10))]
+        code, out = _seed_user(env, user, pw)
+        if code != 0:
+            return [Result("점검용 계정 생성", FAIL, tail(out, 6))]
+        return run_worker("browser", env, base, user, pw, timeout=300)
 
 
 SECRET_PATTERNS = {
@@ -490,7 +540,8 @@ def stage_regress(ctx: Ctx) -> list[Result]:
 RUNNERS = {
     "env": stage_env, "legal": stage_legal, "unit": stage_unit, "legacy": stage_legacy,
     "migrate": stage_migrate, "e2e": stage_e2e, "server": stage_server,
-    "frontend": stage_frontend, "release": stage_release, "regress": stage_regress,
+    "frontend": stage_frontend, "browser": stage_browser,
+    "release": stage_release, "regress": stage_regress,
 }
 
 ICON = {PASS: "PASS ", FAIL: "FAIL ", WARN: "WARN ", SKIP: "SKIP ", KNOWN: "KNOWN"}

@@ -50,7 +50,13 @@ def task_regress() -> list[Result]:
     return regressions.run_all()
 
 
-TASKS = {"drift": task_drift, "e2e": task_e2e, "regress": task_regress}
+def task_browser(base: str, username: str, password: str) -> list[Result]:
+    from . import browser
+
+    return browser.run_flow(base, username, password)
+
+
+TASKS = {"drift": task_drift, "e2e": task_e2e, "regress": task_regress, "browser": task_browser}
 
 
 def main() -> int:

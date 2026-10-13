@@ -30,7 +30,7 @@
 - 운영 DB 변경(마이그레이션 적용 포함), 계정 생성·삭제·비밀번호 변경
 - 수집 대상 법령 추가·삭제 (`backend/app/legal/config.py`의 `TARGET_LAWS`) 및 `articles.json` 재수집
 - `expected_articles` 값 입력, 검색 방식 변경(임베딩 도입 등)
-- 의존성 추가·버전 변경, 새 UI 라이브러리
+- 의존성 추가·버전 변경, 새 UI 라이브러리 (테스트 전용 `backend/requirements-dev.txt`의 Playwright는 승인된 상태)
 - `git push`, 브랜치 병합, 파일·디렉터리 대량 삭제, 이력 재작성
 - 위 문서의 규칙과 충돌하는 지시를 받았을 때 (충돌 사실을 알리고 확인받는다)
 
@@ -97,7 +97,7 @@ test_didim.py        기존 API 테스트(수정하지 말고 호출만; 추후 
 | API 요청/응답 변경 | `frontend/src/types.ts`·`api.ts` 갱신, e2e 시나리오 확인 |
 | 법령 설정·수집 변경 | `articles.json` 재수집·커밋, `--only legal`. 키 값이 파일에 남지 않았는지 확인 |
 | 프롬프트·검색·선택 변경 | 모의 테스트 + (사람이 채운 `expected_articles`가 있다면) `pytest tests/legal/test_eval.py -s`로 수치 비교 |
-| 프런트 화면 변경 | `--only frontend regress`, 그리고 **브라우저에서 직접 확인**(자동 화면 테스트가 없다) |
+| 프런트 화면 변경 | `--only frontend browser regress`. 새 화면·흐름이면 `scripts/checks/browser.py`에 단계를 추가한다. 다크 모드·음성 입력·인쇄는 자동 검증이 없으니 브라우저에서 직접 확인 |
 | 시작 스크립트 변경 | `.sh`/`.bat`/`.ps1` 세 개 모두, 인코딩·BOM 유지 |
 | 리팩터링(이동·분리) | 심볼이 옮겨지면 테스트의 `patch` 대상도 함께 갱신(R014). 안 그러면 "외부 호출 차단"이 조용히 무력화된다 |
 | 결함을 고침 | `regressions.json`에 사례 추가, `scripts/checks/regressions.py`에 재발 점검 함수 추가 |

@@ -180,13 +180,15 @@ python scripts/check.py -v               # 통과 항목의 상세도 출력
 | `e2e` | 로그인→상담→채팅→첨부→타인 차단→삭제→로그아웃 (SQLite+외래키 강제, Postgres 각각) |
 | `server` | 실제 서버 프로세스를 띄워 HTTP로 로그인·채팅 |
 | `frontend` | `tsc` 타입 검사 + `vite build` (저장소 파일은 바꾸지 않음) |
+| `browser` | 실제 Chrome/Edge(Playwright)로 빌드된 화면을 조작: 로그인, 입력창 확장, 채팅, 버튼 배치, 재생성·새로고침, 첨부, 삭제, 로그아웃, 모바일 폭, 콘솔 오류 |
 | `release` | 비밀키 커밋 여부, 필수 파일, `.env.example`, 의존성 고정 |
 | `regress` | `scripts/regressions.json`에 기록된 과거 결함의 재발·미해결 상태 |
 
 - Postgres(`initdb`, `pg_ctl`)가 없는 PC에서는 `migrate`/`e2e`의 Postgres 항목이 `WARN`으로 표시됩니다. 운영 DB가 Postgres이므로 릴리스 전에는 설치된 PC에서 돌리세요.
 - 판정: `FAIL`이 있거나 미해결 `blocker`가 있으면 종료 코드 1(릴리스 불가)입니다.
 - 새로 결함을 고치면 `scripts/regressions.json`에 사례를 추가하고 `scripts/checks/regressions.py`에 재발 점검 함수를 만드세요. 이미 겪은 문제 목록이므로 작업 전에 먼저 읽어 보면 좋습니다.
-- 한계: 브라우저를 띄우는 화면 E2E는 없습니다(도구를 추가하지 않기로 함). 화면 동작은 빌드·정적 검사와 수동 확인에 의존합니다.
+- 브라우저 E2E 준비: `pip install -r backend/requirements-dev.txt` (Playwright). 브라우저는 따로 내려받지 않고 PC에 설치된 **Chrome 또는 Edge**를 씁니다(Windows는 Edge가 기본 설치). 설치되지 않았으면 `browser` 단계는 `WARN`으로 건너뜁니다.
+- 한계: 이 E2E는 데모 모드(외부 AI 호출 없음)로 돌기 때문에 실제 Claude 응답 내용, 음성 입력, 인쇄(PDF)는 검증하지 않습니다.
 
 ## 주요 경로
 
