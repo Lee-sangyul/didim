@@ -356,6 +356,34 @@ def _env_secret_values() -> dict[str, str]:
     return values
 
 
+GENERATED_OK = {"data/legal/legal.db", ".env"}  # 문서에는 나오지만 저장소에는 없는 생성물·로컬 파일
+
+
+def _check_agents_doc() -> Result:
+    """AGENTS.md가 가리키는 경로·결함 ID가 실제로 존재하는지 (낡은 문서는 AI를 오도한다)."""
+    doc = ROOT / "AGENTS.md"
+    if not doc.exists():
+        return Result("AGENTS.md의 경로·결함 ID 유효", FAIL, "AGENTS.md 없음")
+    text = doc.read_text("utf-8")
+
+    names = {p.name for p in ROOT.rglob("*") if p.is_file() and not any(
+        part in (".git", "node_modules", ".venv", "dist", "__pycache__") for part in p.parts)}
+    tokens = set(re.findall(r"`([A-Za-z0-9_./-]+(?:\.(?:py|tsx?|json|css|bat|ps1|sh|md|ini|txt)|/))`", text))
+    missing = []
+    for tok in sorted(tokens):
+        if tok in GENERATED_OK or tok.startswith(("python", "npm")):
+            continue
+        ok = (ROOT / tok).exists() if "/" in tok.rstrip("/") or tok.endswith("/") else (tok in names or (ROOT / tok).exists())
+        if not ok:
+            missing.append(tok)
+
+    registry = {c["id"] for c in json.loads((ROOT / "scripts" / "regressions.json").read_text("utf-8"))["cases"]}
+    bad_ids = sorted(set(re.findall(r"\bR\d{3}\b", text)) - registry)
+
+    problems = [f"없는 경로: {missing}"] * bool(missing) + [f"레지스트리에 없는 결함 ID: {bad_ids}"] * bool(bad_ids)
+    return Result("AGENTS.md의 경로·결함 ID 유효", PASS if not problems else FAIL, "; ".join(problems))
+
+
 def stage_release(ctx: Ctx) -> list[Result]:
     r: list[Result] = []
     required = [
@@ -363,9 +391,12 @@ def stage_release(ctx: Ctx) -> list[Result]:
         "frontend/package.json", "frontend/package-lock.json", "data/legal/articles.json",
         "json/program_config.json", "json/input.json", "json/output.json",
         "start.sh", "start.bat", "start.ps1", "scripts/regressions.json",
+        "AGENTS.md", "CLAUDE.md",
     ]
     missing = [p for p in required if not (ROOT / p).exists()]
     r.append(Result("필수 파일 존재", PASS if not missing else FAIL, f"누락: {missing}" if missing else f"{len(required)}개"))
+
+    r.append(_check_agents_doc())
 
     git = shutil.which("git")
     tracked: list[str] = []
