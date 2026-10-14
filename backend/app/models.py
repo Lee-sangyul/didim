@@ -134,6 +134,10 @@ class Message(SQLModel, table=True):
     role: str
     content: str
 
+    # 답변을 다시 생성할 때 쌓이는 모든 버전(JSON 문자열 리스트, 오래된 것부터).
+    # 비어 있으면("[]") 버전이 하나뿐이다. content는 항상 최신 버전과 같다.
+    versions: str = "[]"
+
     created_at: str = Field(
         default_factory=now_iso,
     )
@@ -292,3 +296,23 @@ class RegistrationDocument(SQLModel, table=True):
         default=None,
         index=True,
     )
+
+class LoginAttempt(SQLModel, table=True):
+    """
+    실패한 로그인 시도 기록 (무차별 대입 방지).
+
+    성공하면 해당 아이디의 기록을 지운다. 존재하지 않는 아이디의 실패도
+    똑같이 기록해서 응답으로 계정 존재 여부를 알 수 없게 한다.
+    """
+
+    __tablename__ = "login_attempts"
+
+    id: Optional[int] = Field(
+        default=None,
+        primary_key=True,
+    )
+
+    username: str = Field(index=True)
+    ip: str = Field(index=True)
+
+    created_at: str = Field(index=True)

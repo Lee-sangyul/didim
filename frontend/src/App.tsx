@@ -20,6 +20,7 @@ import {
   removeAttachment,
   removeCase,
   streamChat,
+  streamRegenerate,
   uploadAttachment,
 } from "./api";
 
@@ -65,6 +66,8 @@ const emptyTitles = [
 ];
 
 const TEXTAREA_MAX_LINES = 5;
+// 전송 가능한 최소 글자 수. 백엔드 ChatInput.min_length와 같아야 한다(scripts R009가 점검).
+const MIN_MESSAGE_LENGTH = 1;
 
 function getRandomEmptyTitle() {
   return emptyTitles[Math.floor(Math.random() * emptyTitles.length)];
@@ -162,66 +165,50 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const isGreetingOnly = messages.length === 1 && messages[0].role === "assistant";
   const visibleMessages = isGreetingOnly ? [] : messages;
 
+  // 답변의 모든 버전(오래된 것부터). 서버가 versions를 비워 두면 버전이 하나뿐이다.
+  function versionsOf(m: Message): string[] {
+    return m.versions && m.versions.length > 0 ? m.versions : [m.content];
+  }
+
   function changeVersion(msgId: number, delta: number) {
+    const target = messages.find(m => m.id === msgId);
+    if (!target) return;
+    const count = versionsOf(target).length;
+
     setActiveVersions(prev => {
-      const curActive = prev[msgId] ?? 0;
-      const versions = messageVersions[msgId] || [""];
-      const nextActive = Math.max(0, Math.min(versions.length - 1, curActive + delta));
-      return { ...prev, [msgId]: nextActive };
+      const current = prev[msgId] ?? count - 1; // 선택한 적이 없으면 최신 버전
+      return { ...prev, [msgId]: Math.max(0, Math.min(count - 1, current + delta)) };
     });
   }
 
-  async function regenerateAnswer(assistantMessage: Message, messageIndex: number) {
-    if (!selected || loading) return;
-    let promptText = "";
-    for (let idx = messageIndex - 1; idx >= 0; idx--) {
-      if (visibleMessages[idx].role === "user") {
-        promptText = visibleMessages[idx].content;
-        break;
-      }
-    }
-    if (!promptText) {
-      promptText = "이전 상황에 대해 다시 검토하고 대응 절차를 안내해 주세요.";
-    }
+  // 마지막 답변만 다시 생성한다. 서버가 같은 답변 메시지에 새 버전을 누적한다(사용자 메시지는 늘지 않음).
+  async function regenerateAnswer(assistantMessage: Message) {
+    const msgId = assistantMessage.id;
+    if (!selected || loading || msgId == null) return;
 
     setLoading(true);
     setError("");
+    setRegenerating({ id: msgId, text: "" });
+    stickToBottom.current = true;
     const startTime = performance.now();
-    const msgId = assistantMessage.id;
-    if (msgId == null) {
-      setLoading(false);
-      return;
-    }
-
-    const baselineMessages = [...messages];
 
     try {
-      let newContent = "";
-      let nextVersionIdx = 0;
-      setMessageVersions(prev => {
-        const cur = prev[msgId] || [assistantMessage.content];
-        nextVersionIdx = cur.length;
-        return { ...prev, [msgId]: [...cur, ""] };
-      });
-      setActiveVersions(prev => ({ ...prev, [msgId]: nextVersionIdx }));
-
-      const newAssessment = await streamChat(selected, promptText, (deltaText) => {
-        newContent += deltaText;
-        setMessageVersions(prev => {
-          const cur = prev[msgId] || [assistantMessage.content];
-          const updated = [...cur];
-          updated[updated.length - 1] = newContent;
-          return { ...prev, [msgId]: updated };
-        });
+      const newAssessment = await streamRegenerate(selected, msgId, (deltaText) => {
+        setRegenerating(prev => (prev ? { ...prev, text: prev.text + deltaText } : prev));
       });
 
       setAssessment(newAssessment);
-      setResponseTime((performance.now() - startTime) / 1000);
-
-      setMessages(baselineMessages);
+      setResponseTime(Number(((performance.now() - startTime) / 1000).toFixed(1)));
+      // 서버가 저장한 버전 목록으로 동기화하고, 새 버전(마지막)을 보여 준다
+      setActiveVersions(prev => {
+        const { [msgId]: _drop, ...rest } = prev;
+        return rest;
+      });
+      await refresh(selected);
     } catch (err) {
-      handleApiError(err);
+      handleApiError(err); // 실패하면 서버에 아무것도 저장되지 않으므로 기존 답변이 그대로 남는다
     } finally {
+      setRegenerating(null);
       setLoading(false);
     }
   }
@@ -452,8 +439,10 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
     if (nearBottom) setShowNewAnswer(false);
   }
 
-  const [messageVersions, setMessageVersions] = useState<Record<number, string[]>>({});
+  // 보고 있는 답변 버전(메시지 id -> 인덱스). 없으면 최신 버전. 버전 자체는 서버(Message.versions)에 저장된다.
   const [activeVersions, setActiveVersions] = useState<Record<number, number>>({});
+  // 다시 생성 중인 답변(스트리밍 텍스트). 완료되면 서버 값으로 대체된다.
+  const [regenerating, setRegenerating] = useState<{ id: number; text: string } | null>(null);
 
   useEffect(() => {
     if (stickToBottom.current) scrollToBottom();
@@ -762,11 +751,18 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
             )}
 
             {visibleMessages.map((m, i) => {
-              const versions = m.id != null ? (messageVersions[m.id] || [m.content]) : [m.content];
-              const activeIdx = m.id != null ? (activeVersions[m.id] ?? 0) : 0;
-              const displayedContent = versions[activeIdx] ?? m.content;
+              const versions = versionsOf(m);
               const versionsCount = versions.length;
+              const activeIdx = Math.min(
+                m.id != null ? (activeVersions[m.id] ?? versionsCount - 1) : versionsCount - 1,
+                versionsCount - 1,
+              );
+              const displayedContent =
+                regenerating && regenerating.id === m.id
+                  ? regenerating.text
+                  : (versions[activeIdx] ?? m.content);
               const currentVersionNum = activeIdx + 1;
+              const isLastMessage = i === visibleMessages.length - 1;
 
               return (
                 <article className={`message ${m.role}`} key={m.id ?? i}>
@@ -809,25 +805,26 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                         )}
                         {!m.content.includes("안녕하세요. 겪고 계신 상황을 시간 순서대로 적어 주세요") && (
                           <>
+                            {/* 서버는 마지막 답변만 다시 생성할 수 있다. 버전 이동은 모든 답변에서 가능 */}
+                            {isLastMessage && (
                             <button
                               type="button"
                               className="regenerate-btn"
-                              onClick={() => regenerateAnswer(m, i)}
+                              onClick={() => regenerateAnswer(m)}
                               title="답변 다시 생성하기"
                               aria-label="답변 다시 생성하기"
-                              style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--mute)', display: 'inline-flex', alignItems: 'center' }}
                             >
                               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.73-5.73" />
                               </svg>
                             </button>
+                            )}
                             {versionsCount >= 2 && (
-                              <span className="version-nav" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: '6px', padding: '2px 8px', background: 'var(--surface)' }}>
+                              <span className="version-nav">
                                 <button
                                   type="button"
                                   onClick={() => changeVersion(m.id!, -1)}
                                   disabled={currentVersionNum <= 1}
-                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum > 1 ? 'pointer' : 'default', opacity: currentVersionNum > 1 ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
                                 >
                                   &lt;
                                 </button>
@@ -836,7 +833,6 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                                   type="button"
                                   onClick={() => changeVersion(m.id!, 1)}
                                   disabled={currentVersionNum >= versionsCount}
-                                  style={{ background: 'none', border: 'none', cursor: currentVersionNum < versionsCount ? 'pointer' : 'default', opacity: currentVersionNum < versionsCount ? 1 : 0.4, padding: '0', color: 'inherit', fontWeight: 'bold' }}
                                 >
                                   &gt;
                                 </button>
@@ -901,7 +897,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                   )}
                 </button>
 
-                <button type="submit" className="send-btn" disabled={loading || input.trim().length < 2}>
+                <button type="submit" className="send-btn" disabled={loading || input.trim().length < MIN_MESSAGE_LENGTH}>
                   {loading ? "…" : "➜"}
                 </button>
               </div>

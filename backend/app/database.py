@@ -61,6 +61,7 @@ def init_sqlite_schema() -> None:
     added_columns = [
         ("case", "based_law", "VARCHAR DEFAULT '[]'"),
         ("assessment", "citations", "VARCHAR DEFAULT '[]'"),
+        ("message", "versions", "VARCHAR DEFAULT '[]'"),
     ]
 
     with engine.connect() as conn:

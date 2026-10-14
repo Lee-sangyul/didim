@@ -151,8 +151,45 @@ def r009_min_length_consistent():
 
 
 def r010_regenerate_endpoint_exists():
-    found = [p.name for p in (BACKEND / "app" / "routers").glob("*.py") if "regenerate" in _read(p).lower()]
-    return bool(found), "전용 재생성 엔드포인트 있음" if found else "재생성 전용 엔드포인트 없음(/chat 재사용)"
+    """실제 동작으로 점검: 재생성해도 사용자 메시지가 늘지 않고 같은 답변에 버전이 쌓인다."""
+    import uuid
+
+    from fastapi.testclient import TestClient
+    from sqlmodel import Session, select
+
+    from app.database import engine
+    from app.main import app
+    from app.models import Case, Message, User
+    from app.routers.auth import get_current_user
+
+    with TestClient(app) as client:
+        with Session(engine) as s:
+            user = User(username=f"r010_{uuid.uuid4().hex[:6]}", password_hash="x", name="r010")
+            s.add(user)
+            s.commit()
+            s.refresh(user)
+            case = Case(owner_id=user.id)
+            s.add(case)
+            s.commit()
+            s.refresh(case)
+            uid, cid = user.id, case.id
+
+        app.dependency_overrides[get_current_user] = lambda: User(id=uid, username="x", password_hash="x", name="x")
+        try:
+            client.post(f"/api/cases/{cid}/chat", json={"content": "학부모가 반복해서 욕설을 합니다."})
+            with Session(engine) as s:
+                before = list(s.exec(select(Message).where(Message.case_id == cid).order_by(Message.id)))
+            answer = before[-1]
+            resp = client.post(f"/api/cases/{cid}/messages/{answer.id}/regenerate")
+            with Session(engine) as s:
+                after = list(s.exec(select(Message).where(Message.case_id == cid).order_by(Message.id)))
+        finally:
+            app.dependency_overrides.clear()
+
+    same_count = len(after) == len(before)
+    versions = len(json.loads(after[-1].versions or "[]"))
+    ok = resp.status_code == 200 and same_count and versions == 2
+    return ok, f"status={resp.status_code}, 메시지 {len(before)}->{len(after)}, 버전 {versions}"
 
 
 def r011_dist_has_no_stale_assets():
@@ -167,9 +204,19 @@ def r011_dist_has_no_stale_assets():
 
 
 def r012_retriever_supports_postgres():
-    text = _read(BACKEND / "app" / "legal" / "retriever.py")
-    ok = "tsvector" in text or "pg_trgm" in text
-    return ok, "Postgres 검색 경로 있음" if ok else "FTS5(SQLite) 전용 구현"
+    """법령 DB는 SQLite 파일로 유지하고, articles.json만 배포하면 서버가 스스로 만든다."""
+    import tempfile
+
+    from sqlalchemy import create_engine
+
+    from app.legal.bootstrap import ensure_legal_db
+
+    # import 줄이 아니라 실제 호출이 있어야 한다
+    wired = "ensure_legal_db()" in _read(BACKEND / "app" / "main.py")
+    with tempfile.TemporaryDirectory() as tmp:
+        state = ensure_legal_db(create_engine(f"sqlite:///{Path(tmp) / 'legal.db'}"))
+    ok = wired and state["status"] == "rebuilt" and state["articles"] > 0
+    return ok, f"startup 연결={wired}, 빈 폴더에서 {state['status']} (조문 {state['articles']}건)"
 
 
 def r013_env_example_complete():
@@ -187,8 +234,63 @@ def r014_external_call_guard_targets_exist():
 
 def r015_no_inline_styles():
     n = frontend_static.inline_style_count()
-    allow = sorted(frontend_static.UNSTYLED_OK)
-    return n == 0, f"인라인 style {n}곳, CSS 규칙 없이 허용 중인 클래스: {allow}"
+    return n == 0, f"인라인 style {n}곳 (데이터 기반 너비 제외)" if n else "인라인 style 없음(데이터 기반 게이지 너비 제외)"
+
+
+def r017_registration_documents_get_deleted():
+    """5년 보관 정책: 기한 계산(신청·심사 시점), 만료 문서 삭제 작업, 기존 데이터 재계산 마이그레이션."""
+    from app.services import retention
+
+    parts = {
+        "정책 5년": retention.RETENTION_YEARS == 5,
+        "신청 시 기한 설정": "retention_deadline" in _read(BACKEND / "app" / "routers" / "registration.py"),
+        "심사 시 기한 재계산": _read(BACKEND / "app" / "routers" / "admin_registration.py").count("deadline_iso_from(reviewed_at)") == 2,
+        "삭제 작업(CLI)": (BACKEND / "scripts" / "purge_registration_documents.py").exists(),
+        "삭제 시 deleted_at 기록": "deleted_at = now_iso()" in _read(BACKEND / "app" / "services" / "retention.py"),
+        "기존 데이터 재계산 마이그레이션": any(
+            "recompute document_delete_after" in _read(p) for p in (BACKEND / "migrations" / "versions").glob("*.py")
+        ),
+    }
+    bad = [k for k, v in parts.items() if not v]
+    return not bad, f"누락: {bad}" if bad else "정책·삭제 작업·마이그레이션 모두 있음"
+
+
+def r018_login_rate_limited():
+    """실제 동작: 같은 아이디로 반복 실패하면 429, 잠긴 동안은 올바른 비밀번호도 거부."""
+    import uuid
+
+    from fastapi.testclient import TestClient
+    from sqlmodel import Session
+
+    from app.database import engine
+    from app.main import app
+    from app.models import User
+    from app.security.password import hash_password
+    from app.services import login_guard
+
+    name, pw = f"r018_{uuid.uuid4().hex[:6]}", "right-password-1234"
+    with Session(engine) as s:
+        s.add(User(username=name, password_hash=hash_password(pw), name="r018"))
+        s.commit()
+
+    with TestClient(app) as c:
+        codes = [
+            c.post("/api/auth/login", json={"username": name, "password": "wrong-password"}).status_code
+            for _ in range(login_guard.MAX_FAILURES_PER_USER)
+        ]
+        locked = c.post("/api/auth/login", json={"username": name, "password": pw})
+    ok = codes[:-1] == [401] * (len(codes) - 1) and codes[-1] == 429 and locked.status_code == 429
+    return ok, f"실패 응답 {codes}, 잠금 중 올바른 비밀번호 -> {locked.status_code}"
+
+
+def r019_login_limit_consistent():
+    """브라우저가 미리 적용하는 한도가 서버 한도와 같은지."""
+    text = _read(BACKEND / "app" / "services" / "login_guard.py")
+    mf = re.search(r"MAX_FAILURES_PER_USER\s*=\s*(\d+)", text)
+    wm = re.search(r"WINDOW_MINUTES\s*=\s*(\d+)", text)
+    server = (int(mf.group(1)) if mf else None, int(wm.group(1)) if wm else None)
+    client = frontend_static.login_guard_limits()
+    return server == client, f"서버(횟수, 분)={server}, 브라우저={client}"
 
 
 # ------------------------------------------------------------------ 실행

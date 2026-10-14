@@ -416,6 +416,7 @@
 
 .copy-btn,
 .bookmark-btn,
+.regenerate-btn,
 .retry-btn {
   flex: none;
   width: 30px;
@@ -438,6 +439,7 @@
 
 .copy-btn:hover,
 .bookmark-btn:hover,
+.regenerate-btn:hover,
 .retry-btn:hover {
   background: var(--hover-soft);
   color: var(--action-ink-hover);
@@ -445,6 +447,7 @@
 
 .copy-btn:active,
 .bookmark-btn:active,
+.regenerate-btn:active,
 .retry-btn:active {
   transform: scale(0.94);
 }
@@ -454,7 +457,8 @@
 }
 
 .copy-btn svg,
-.bookmark-btn svg {
+.bookmark-btn svg,
+.regenerate-btn svg {
   display: block;
 }
 
@@ -1099,4 +1103,34 @@ section label {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+/* 답변 버전 이동(< 2/3 >): 다시 생성한 답변이 둘 이상일 때 표시 */
+.version-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11.5px;
+}
+
+.version-nav button {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.version-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

@@ -9,11 +9,7 @@ from .core import FRONTEND
 SRC = FRONTEND / "src"
 
 # CSS 규칙이 없어도 되는 클래스(상태 표시·스크립트 훅 등). 필요하면 근거와 함께 추가한다.
-UNSTYLED_OK: set[str] = {
-    # 인라인 style={{...}}로만 꾸며진 재생성 UI. CSS로 옮기면 이 목록에서 지운다 (R015).
-    "regenerate-btn",
-    "version-nav",
-}
+UNSTYLED_OK: set[str] = set()
 
 
 def _strip_css(text: str) -> str:
@@ -83,10 +79,27 @@ def dead_state() -> list[str]:
 def send_min_length() -> int | None:
     """App.tsx에서 전송 버튼이 막히는 최소 글자 수(`input.trim().length < N`)."""
     text = (SRC / "App.tsx").read_text("utf-8")
-    m = re.search(r"input\.trim\(\)\.length\s*<\s*(\d+)", text)
+    m = re.search(r"MIN_MESSAGE_LENGTH\s*=\s*(\d+)", text)
     return int(m.group(1)) if m else None
 
 
 def inline_style_count() -> int:
-    """JSX 인라인 style={{ ... }} 개수. 디자인 토큰·다크 모드와 어긋나기 쉬워 줄여 가는 지표."""
-    return sum(len(re.findall(r"style=\{\{", p.read_text("utf-8"))) for p in SRC.glob("*.tsx"))
+    """JSX 인라인 style={{ ... }} 개수. 디자인 토큰·다크 모드와 어긋나기 쉬워 0으로 유지한다.
+
+    예외: 데이터에서 계산되는 너비(`style={{ width: `${...}%` }}`, 게이지 막대)는 CSS로 표현할 수 없어 허용한다.
+    """
+    total = 0
+    for path in SRC.glob("*.tsx"):
+        for m in re.finditer(r"style=\{\{([^}]*)\}\}", path.read_text("utf-8")):
+            if re.fullmatch(r"\s*width:\s*`\$\{[^}]+\}%`\s*", m.group(1)):
+                continue
+            total += 1
+    return total
+
+
+def login_guard_limits() -> tuple[int | None, int | None]:
+    """프런트 loginGuard.ts의 (MAX_FAILURES, WINDOW_MINUTES)."""
+    text = (SRC / "loginGuard.ts").read_text("utf-8") if (SRC / "loginGuard.ts").exists() else ""
+    mf = re.search(r"MAX_FAILURES\s*=\s*(\d+)", text)
+    wm = re.search(r"WINDOW_MINUTES\s*=\s*(\d+)", text)
+    return (int(mf.group(1)) if mf else None, int(wm.group(1)) if wm else None)

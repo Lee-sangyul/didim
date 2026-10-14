@@ -86,9 +86,37 @@ def run_scenario(label: str) -> list[Result]:
                 keys = {"level", "score", "category", "rationale", "actions", "based_law", "citations"}
                 step("응답에 평가 필드 포함", keys <= set(done["assessment"]), f"누락: {keys - set(done['assessment'])}")
 
-            roles = [m["role"] for m in a.get(f"/api/cases/{case_id}/messages").json()]
+            msgs = a.get(f"/api/cases/{case_id}/messages").json()
+            roles = [m["role"] for m in msgs]
             step("메시지 저장(안내·질문·답변)", roles == ["assistant", "user", "assistant"], f"roles={roles}")
             step("평가 이력 저장", len(a.get(f"/api/cases/{case_id}/assessments").json()) == 1, "평가가 1건이 아님")
+
+            # 답변 다시 생성: 사용자 메시지가 늘지 않고 같은 답변에 버전이 쌓여야 한다 (R010)
+            answer_id, greeting_id = msgs[-1]["id"], msgs[0]["id"]
+            regen = a.post(f"/api/cases/{case_id}/messages/{answer_id}/regenerate")
+            regen_events = _sse(regen.text)
+            step(
+                "답변 다시 생성(delta -> done)",
+                regen.status_code == 200 and any(e["type"] == "done" for e in regen_events)
+                and not any(e["type"] == "error" for e in regen_events),
+                f"{regen.status_code} {[e['type'] for e in regen_events][:4]}",
+            )
+            after = a.get(f"/api/cases/{case_id}/messages").json()
+            step(
+                "재생성 후 메시지 수 불변(사용자 질문 중복 없음)",
+                [m["role"] for m in after] == roles, f"roles={[m['role'] for m in after]}",
+            )
+            step(
+                "재생성 버전이 같은 답변에 저장",
+                len(after[-1]["versions"]) == 2 and after[-1]["content"] == after[-1]["versions"][-1],
+                f"versions={len(after[-1]['versions'])}",
+            )
+            step(
+                "안내 메시지·타인 요청은 재생성 거부",
+                a.post(f"/api/cases/{case_id}/messages/{greeting_id}/regenerate").status_code in (400, 409)
+                and b.post(f"/api/cases/{case_id}/messages/{answer_id}/regenerate").status_code == 404,
+                "거부되지 않음",
+            )
 
             payload = b"%PDF-1.4 check"
             up = a.post(f"/api/cases/{case_id}/attachments", files={"file": ("증거.pdf", payload, "application/pdf")})
@@ -127,6 +155,24 @@ def run_scenario(label: str) -> list[Result]:
 
             a.post("/api/auth/logout")
             step("로그아웃 후 접근 차단", a.get("/api/cases").status_code == 401, "여전히 접근 가능")
+
+            # 무차별 대입 방지(R018): 반복 실패 -> 429, 잠긴 동안은 올바른 비밀번호도 거부, 다른 아이디는 영향 없음
+            codes = [
+                anon.post("/api/auth/login", json={"username": other, "password": "wrong-password"}).status_code
+                for _ in range(5)
+            ]
+            step("반복 실패 시 로그인 잠금(429)", codes[:4] == [401] * 4 and codes[4] == 429, f"codes={codes}")
+            locked = anon.post("/api/auth/login", json={"username": other, "password": PASSWORD})
+            step(
+                "잠긴 동안 올바른 비밀번호도 거부, Retry-After 제공",
+                locked.status_code == 429 and int(locked.headers.get("retry-after", "0")) > 0,
+                f"{locked.status_code} retry-after={locked.headers.get('retry-after')}",
+            )
+            step(
+                "다른 아이디는 잠기지 않음",
+                anon.post("/api/auth/login", json={"username": owner, "password": PASSWORD}).status_code == 200,
+                "다른 계정까지 잠김",
+            )
 
         # 점검 계정 정리 (Postgres 임시 DB여도 흔적을 남기지 않는다)
         with Session(engine) as s:

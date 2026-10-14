@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# 브라우저 E2E(scripts/check.py의 browser 단계). 운영 배포에는 필요 없다.
+# 브라우저는 따로 내려받지 않고 PC에 설치된 Chrome/Edge를 쓴다.
+playwright==1.63.0

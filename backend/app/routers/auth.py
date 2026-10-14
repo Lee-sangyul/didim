@@ -5,9 +5,11 @@ from fastapi import (
     Cookie,
     Depends,
     HTTPException,
+    Request,
     Response,
     status,
 )
+from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from ..config import settings
@@ -23,8 +25,10 @@ from ..security.session import (
     SESSION_COOKIE_NAME,
     SESSION_DURATION_DAYS,
 )
+from ..services import login_guard
 from ..services.auth_service import (
     authenticate_user,
+    normalize_username,
     create_auth_session,
     get_user_from_session_token,
     revoke_auth_session,
@@ -35,6 +39,18 @@ router = APIRouter(
     prefix="/api/auth",
     tags=["auth"],
 )
+
+
+def _locked_response(retry_after: int) -> JSONResponse:
+    minutes = max(1, (retry_after + 59) // 60)
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "detail": f"로그인 시도가 너무 많습니다. 약 {minutes}분 후에 다시 시도해 주세요.",
+            "retry_after": retry_after,
+        },
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 SessionDependency = Annotated[
@@ -87,12 +103,23 @@ CurrentUserDependency = Annotated[
 )
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     session: SessionDependency,
 ) -> LoginResponse:
     """
     아이디와 비밀번호로 로그인한다.
+
+    같은 아이디·IP에서 실패가 반복되면 일정 시간 잠근다(login_guard).
     """
+    username = normalize_username(payload.username)
+    ip = request.client.host if request.client else "unknown"
+
+    state = login_guard.check(session, username, ip)
+
+    if state.locked:
+        return _locked_response(state.retry_after)  # type: ignore[return-value]
+
     user = authenticate_user(
         session=session,
         username=payload.username,
@@ -100,10 +127,18 @@ def login(
     )
 
     if user is None:
+        state = login_guard.record_failure(session, username, ip)
+
+        if state.locked:
+            return _locked_response(state.retry_after)  # type: ignore[return-value]
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
+            headers={"X-Remaining-Attempts": str(state.remaining)},
         )
+
+    login_guard.clear_user(session, username)
 
     session_token = create_auth_session(
         session=session,

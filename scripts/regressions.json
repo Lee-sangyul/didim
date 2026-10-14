@@ -113,49 +113,49 @@
       "id": "R009",
       "title": "백엔드와 프런트의 최소 입력 글자 수 불일치",
       "area": "frontend",
-      "status": "open",
+      "status": "fixed",
       "severity": "minor",
       "symptom": "백엔드는 1글자부터 허용하지만 전송 버튼은 2글자 미만에서 비활성",
       "root_cause": "ChatInput.min_length만 2->1로 바뀌고 프런트 조건이 그대로",
-      "fix": "한쪽 기준으로 통일(상수 하나를 정해 양쪽에 반영)",
+      "fix": "전송 가능 최소 글자 수를 1로 통일(App.tsx MIN_MESSAGE_LENGTH = 백엔드 ChatInput.min_length). 점검이 두 값을 비교",
       "check": "r009_min_length_consistent",
-      "refs": "backend/app/schemas/cases.py, frontend/src/App.tsx"
+      "refs": "frontend/src/App.tsx, backend/app/schemas/cases.py"
     },
     {
       "id": "R010",
       "title": "답변 다시 생성이 DB에 사용자 메시지를 중복 저장",
       "area": "backend",
-      "status": "open",
+      "status": "fixed",
       "severity": "major",
       "symptom": "다시 생성할 때마다 같은 질문과 새 답변이 DB에 쌓임. 새로고침하면 중복이 보이고 Claude 대화 이력도 오염. 버전 목록은 React state라 새로고침하면 사라짐",
       "root_cause": "regenerateAnswer가 일반 /chat 엔드포인트를 재사용",
-      "fix": "전용 재생성 엔드포인트(기존 사용자 메시지 재사용, 답변 버전 저장)",
+      "fix": "POST /api/cases/{id}/messages/{message_id}/regenerate. 새 사용자 메시지를 만들지 않고 기존 답변 메시지의 versions(JSON)에 버전을 누적한다. 마지막 답변만 허용, 최대 10버전. 프런트는 완료 후 서버 값으로 동기화",
       "check": "r010_regenerate_endpoint_exists",
-      "refs": "frontend/src/App.tsx regenerateAnswer"
+      "refs": "backend/app/services/chat_service.py start_regeneration, migration c4d5e6f7a8b9, frontend/src/App.tsx"
     },
     {
       "id": "R011",
-      "title": "커밋된 frontend/dist에 오래된 번들이 섞임",
+      "title": "커밋된 frontend/dist에 오래된 번들이 섞이거나 소스와 어긋남",
       "area": "release",
-      "status": "open",
+      "status": "fixed",
       "severity": "minor",
       "symptom": "dist/assets에 index.html이 참조하지 않는 구버전 번들이 남아 용량·혼동 유발",
       "root_cause": "dist를 git에 포함(.gitignore 변경)하면서 빌드 산출물이 누적됨",
-      "fix": "릴리스 직전에만 dist를 비우고 새로 빌드해 커밋하거나, dist는 git에서 제외하고 배포 파이프라인에서 빌드",
+      "fix": "dist를 git에 두기로 결정(2026-10). 릴리스 전에 `npm run build`로 다시 만들고 오래된 번들을 지운 뒤 커밋한다. 점검이 오래된 번들(FAIL)과 소스와의 불일치(WARN)를 알린다",
       "check": "r011_dist_has_no_stale_assets",
       "refs": ".gitignore, frontend/dist"
     },
     {
       "id": "R012",
-      "title": "법령 검색이 SQLite(FTS5) 전용 — Postgres 이관 시 대안 필요",
+      "title": "법령 검색 DB(SQLite 파일)를 별도로 복원해야 해서 배포 때 빠뜨릴 수 있음",
       "area": "data",
-      "status": "open",
+      "status": "fixed",
       "severity": "major",
-      "symptom": "서버를 Postgres 전용으로 옮기면 legal.db(SQLite 파일) 복원·검색 경로가 별도로 남음",
-      "root_cause": "retriever가 SQLite FTS5 trigram에 의존하고 법령 DB를 별도 SQLite 파일로 분리함",
-      "fix": "Postgres pg_trgm/tsvector 기반 retriever 구현(search() 인터페이스는 유지) 또는 법령 DB 파일 배포 절차 확립",
+      "symptom": "서버를 새로 배포하면 legal.db가 없어 근거 조문이 오류 없이 사라짐(R004와 같은 유형)",
+      "root_cause": "legal.db는 git·배포물에 없는 생성물이고, 복원 명령을 실행해야만 만들어졌다",
+      "fix": "서버가 시작할 때 data/legal/articles.json으로 legal.db를 자동 생성·교체한다(app/legal/bootstrap.py). 배포 시에는 articles.json만 함께 배포하면 되고, /api/health의 legal 항목으로 상태를 본다. Postgres 검색으로의 전환은 하지 않기로 결정",
       "check": "r012_retriever_supports_postgres",
-      "refs": "backend/app/legal/retriever.py, backend/app/legal/db.py"
+      "refs": "backend/app/legal/bootstrap.py, backend/app/main.py"
     },
     {
       "id": "R013",
@@ -185,13 +185,61 @@
       "id": "R015",
       "title": "JSX 인라인 style이 많아 디자인 토큰·다크 모드와 어긋남",
       "area": "frontend",
-      "status": "open",
+      "status": "fixed",
       "severity": "minor",
       "symptom": "재생성·버전 이동 버튼 등이 색·간격을 하드코딩해 테마 변경 시 따로 놀 수 있음",
       "root_cause": "CSS 파일로 옮기지 않고 컴포넌트에 style={{}}로 직접 작성",
-      "fix": "className + CSS(토큰 사용)로 이전하고 frontend_static.UNSTYLED_OK 항목을 제거",
+      "fix": "재생성·버전 이동 버튼을 className + CSS(디자인 토큰)로 이전. 데이터 기반 게이지 너비만 예외",
       "check": "r015_no_inline_styles",
-      "refs": "frontend/src/App.tsx"
+      "refs": "frontend/src/styles/app.css, frontend/src/App.tsx"
+    },
+    {
+      "id": "R016",
+      "title": "모델 컬럼 추가 후 운영 DB에 마이그레이션이 적용되기 전에 코드를 배포하면 조회가 깨짐",
+      "area": "release",
+      "status": "open",
+      "severity": "major",
+      "symptom": "새 코드가 message.versions 등 새 컬럼을 조회하는 순간 운영 DB(Postgres)에 컬럼이 없어 오류(R003과 같은 유형)",
+      "root_cause": "마이그레이션 적용과 코드 배포가 분리돼 있고 순서를 강제하는 장치가 없음",
+      "fix": "배포 절차에 '1) alembic upgrade head(운영 DB) 2) 코드 배포' 순서를 명시. 자동화 전까지 릴리스 체크리스트로 관리",
+      "check": null,
+      "refs": "R003, backend/migrations/versions/c4d5e6f7a8b9_add_message_versions.py"
+    },
+    {
+      "id": "R017",
+      "title": "가입 증빙 문서가 삭제 예정일이 지나도 삭제되지 않음",
+      "area": "security",
+      "status": "fixed",
+      "severity": "major",
+      "symptom": "재직증명서 등 민감 문서가 Supabase Storage에 무기한 남음. 신청 시 30일 후 삭제 예정 시각만 기록됨(document_delete_after)",
+      "root_cause": "삭제 작업(스케줄러·관리 명령)이 없고, 승인·거절 처리에서도 문서를 지우지 않음. deleted_at 컬럼은 어디에서도 설정되지 않음",
+      "fix": "보관 정책 5년(심사 시점 기준, 심사 전에는 신청 시점 상한). `python -m scripts.purge_registration_documents`가 만료 문서를 Storage에서 지우고 deleted_at을 기록한다. 기존 신청서의 기한은 마이그레이션 e6f7a8b9c0d1이 재계산한다. 이 명령을 정기 실행하도록 운영 환경에 설정해야 실제로 삭제된다",
+      "check": "r017_registration_documents_get_deleted",
+      "refs": "backend/app/services/retention.py, backend/scripts/purge_registration_documents.py, migration e6f7a8b9c0d1"
+    },
+    {
+      "id": "R018",
+      "title": "로그인 시도 횟수 제한이 없음",
+      "area": "security",
+      "status": "fixed",
+      "severity": "major",
+      "symptom": "비밀번호 무차별 대입을 막는 장치가 없음(상담 내용·교원 개인정보 접근 계정)",
+      "root_cause": "로그인 엔드포인트에 시도 제한·잠금·지연이 구현되지 않음",
+      "fix": "DB 기반 로그인 시도 제한(backend/app/services/login_guard.py): 아이디 5회/15분, IP 20회/15분. 잠기면 429와 Retry-After. 브라우저도 같은 한도를 미리 적용(frontend/src/loginGuard.ts)",
+      "check": "r018_login_rate_limited",
+      "refs": "backend/app/routers/auth.py, backend/app/services/login_guard.py, frontend/src/loginGuard.ts, frontend/src/LoginPage.tsx"
+    },
+    {
+      "id": "R019",
+      "title": "서버와 브라우저의 로그인 시도 한도가 어긋남",
+      "area": "security",
+      "status": "fixed",
+      "severity": "minor",
+      "symptom": "브라우저는 5회에서 잠그는데 서버는 다른 값이면 안내와 실제 차단이 어긋남",
+      "root_cause": "같은 한도를 두 언어에 각각 정의함",
+      "fix": "점검이 두 값(횟수·분)을 비교한다. 바꿀 때는 양쪽을 함께 바꾼다",
+      "check": "r019_login_limit_consistent",
+      "refs": "backend/app/services/login_guard.py, frontend/src/loginGuard.ts"
     }
   ]
 }

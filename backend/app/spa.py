@@ -3,6 +3,7 @@
 개발 중에는 Vite(5173)가 화면을 주므로 dist가 없으면 아무것도 하지 않는다.
 반드시 모든 API 라우터를 등록한 뒤에 호출해야 한다(catch-all 라우트가 있기 때문).
 """
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,11 @@ from .config import ROOT
 
 
 def default_dist() -> Path:
+    # 점검 스크립트(scripts/check.py)가 임시 위치에 빌드한 산출물을 서빙할 때만 쓰는 지정
+    override = os.environ.get("FRONTEND_DIST")
+    if override:
+        return Path(override)
+
     # PyInstaller로 묶인 exe는 실행 파일 옆의 frontend/dist를 쓴다.
     base = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
     return base / "frontend" / "dist"
