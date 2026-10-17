@@ -10,13 +10,16 @@ from app.config import settings
 
 config = context.config
 
-if config.config_file_name is not None:
+# 서버가 시작할 때 app.db_migrate가 호출하면 앱의 로깅 설정을 덮어쓰지 않도록 건너뛴다
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
-config.set_main_option(
-    "sqlalchemy.url",
-    settings.database_url.replace("%", "%%"),
-)
+# 기본은 앱 설정(.env)의 DB. app.db_migrate가 특정 엔진을 넘기면 그 주소를 그대로 쓴다.
+if not config.attributes.get("keep_url"):
+    config.set_main_option(
+        "sqlalchemy.url",
+        settings.database_url.replace("%", "%%"),
+    )
 
 target_metadata = SQLModel.metadata
 
