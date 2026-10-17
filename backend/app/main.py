@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .db_migrate import ensure_schema
 from .legal.bootstrap import ensure_legal_db
 from .database import engine, init_sqlite_schema  # noqa: F401  (engine: 테스트가 사용)
 from .routers import auth_router
@@ -38,6 +39,10 @@ app.include_router(chat_router)
 def startup() -> None:
     if settings.is_sqlite:
         init_sqlite_schema()
+        app.state.db = {"status": "sqlite"}
+    else:
+        # 빈 DB면 처음 한 번 마이그레이션을 적용하고, 뒤처진 DB는 자동으로 바꾸지 않고 경고한다
+        app.state.db = ensure_schema(engine)
 
     UPLOAD_DIR.mkdir(
         parents=True,
@@ -61,6 +66,12 @@ def health() -> dict:
         "mode": "demo" if demo else "claude",
         "environment": settings.app_env,
     }
+
+
+@app.get("/api/health/db")
+def health_db() -> dict:
+    """DB 스키마 상태: sqlite | ready | outdated | unmanaged | error. (접속 정보는 포함하지 않는다)"""
+    return getattr(app.state, "db", None) or {"status": "unknown"}
 
 
 @app.get("/api/health/legal")
