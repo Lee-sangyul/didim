@@ -135,6 +135,22 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const [assessment, setAssessment] = useState<Assessment>(initialAssessment);
   const [loading, setLoading] = useState(false);
   const [aside, setAside] = useState(true);
+  const [asideWidth, setAsideWidth] = useState(332);
+  const [railWidth, setRailWidth] = useState(248);
+  const resizingAside = useRef(false);
+  const resizingRail = useRef(false);
+
+  const resizeRail = (clientX: number) => {
+    const maxWidth = Math.min(420, Math.floor(window.innerWidth * 0.35));
+    setRailWidth(Math.max(180, Math.min(maxWidth, clientX)));
+  };
+
+  const resizeAside = (clientX: number) => {
+    const maxWidth = Math.floor(window.innerWidth / 4);
+    const nextWidth = window.innerWidth - clientX;
+
+    setAsideWidth(Math.max(0, Math.min(maxWidth, nextWidth)));
+  };
   const [error, setError] = useState("");
   const [inputMultiline, setInputMultiline] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -666,8 +682,22 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
         </button>
       </header>
 
-      <div className={`layout ${aside ? "" : "aside-closed"} ${darkMode ? "dark-mode" : ""}`}>
+      <div
+        className={`layout ${aside ? "" : "aside-closed"} ${darkMode ? "dark-mode" : ""}`}
+        style={{ "--aside-width": `${asideWidth}px`, "--rail-width": `${railWidth}px` } as React.CSSProperties}
+      >
         {railOpen && <div className="rail-backdrop show" onClick={() => setRailOpen(false)} />}
+        {!aside && (
+          <button
+            type="button"
+            className="aside-reopen-btn"
+            onClick={() => setAside(true)}
+            aria-label="상담 결과 열기"
+            title="상담 결과 열기"
+          >
+            ‹
+          </button>
+        )}
 
         <nav className={`rail ${railOpen ? "open" : ""}`}>
           <div className="brand">
@@ -707,6 +737,39 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
             🔒 상담은 사용자별로 분리되어 저장됩니다.
           </div>
         </nav>
+
+        <div
+          className="rail-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="최근 상담 목록 너비 조절"
+          title="드래그하여 최근 상담 목록 너비 조절"
+          tabIndex={0}
+          onKeyDown={e => {
+            if (e.key === "ArrowLeft") setRailWidth(width => Math.max(180, width - 16));
+            if (e.key === "ArrowRight") setRailWidth(width => Math.min(Math.min(420, Math.floor(window.innerWidth * 0.35)), width + 16));
+            if (e.key === "Home") setRailWidth(180);
+            if (e.key === "End") setRailWidth(Math.min(420, Math.floor(window.innerWidth * 0.35)));
+          }}
+          onPointerDown={e => {
+            if (e.button !== 0 || window.innerWidth <= 700) return;
+            resizingRail.current = true;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            e.preventDefault();
+          }}
+          onPointerMove={e => {
+            if (resizingRail.current) resizeRail(e.clientX);
+          }}
+          onPointerUp={e => {
+            resizingRail.current = false;
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          }}
+          onPointerCancel={() => {
+            resizingRail.current = false;
+          }}
+        />
 
         <section className="chat">
           <div className="chat-head">
@@ -807,17 +870,17 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                           <>
                             {/* 서버는 마지막 답변만 다시 생성할 수 있다. 버전 이동은 모든 답변에서 가능 */}
                             {isLastMessage && (
-                            <button
-                              type="button"
-                              className="regenerate-btn"
-                              onClick={() => regenerateAnswer(m)}
-                              title="답변 다시 생성하기"
-                              aria-label="답변 다시 생성하기"
-                            >
-                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.73-5.73" />
-                              </svg>
-                            </button>
+                              <button
+                                type="button"
+                                className="regenerate-btn"
+                                onClick={() => regenerateAnswer(m)}
+                                title="답변 다시 생성하기"
+                                aria-label="답변 다시 생성하기"
+                              >
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.73-5.73" />
+                                </svg>
+                              </button>
                             )}
                             {versionsCount >= 2 && (
                               <span className="version-nav">
@@ -907,7 +970,51 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
         </section>
 
         {aside && (
-          <aside className="aside">
+          <aside className={`aside ${asideWidth <= 48 ? "aside-minimized" : ""}`}>
+            {asideWidth <= 48 && (
+              <button
+                type="button"
+                className="aside-restore-btn"
+                onClick={() => setAsideWidth(332)}
+                aria-label="상담 결과창 기본 너비로 복원"
+                title="기본 너비로 복원"
+              >
+                ‹
+              </button>
+            )}
+            <div
+              className="aside-resizer"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="상담 결과창 너비 조절"
+              title="드래그하여 너비 조절"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "ArrowLeft") setAsideWidth(width => Math.min(Math.floor(window.innerWidth / 4), width + 16));
+                if (e.key === "ArrowRight") setAsideWidth(width => Math.max(0, width - 16));
+                if (e.key === "Home") setAsideWidth(0);
+                if (e.key === "End") setAsideWidth(Math.floor(window.innerWidth / 4));
+              }}
+              onPointerDown={e => {
+                if (e.button !== 0) return;
+                resizingAside.current = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                e.preventDefault();
+              }}
+              onPointerMove={e => {
+                if (resizingAside.current) resizeAside(e.clientX);
+              }}
+              onPointerUp={e => {
+                resizingAside.current = false;
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                }
+              }}
+              onPointerCancel={() => {
+                resizingAside.current = false;
+              }}
+            />
+
             <div className="aside-head">
               <div>
                 <h2>상담 결과</h2>
@@ -915,6 +1022,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
               </div>
               <button onClick={() => setAside(false)}>›</button>
             </div>
+
             <div className="aside-scroll">
               <div className="meta"><span>분류</span><b>{assessment.category}</b></div>
 
@@ -980,6 +1088,7 @@ function Workspace({ user, onLoggedOut }: WorkspaceProps) {
                 <p>법령과 절차는 개정될 수 있습니다. 이 앱의 결과만으로 신고·징계·법적 조치를 결정하지 마세요.</p>
               </section>
             </div>
+
             <div className="aside-actions"><button onClick={exportPrint}>PDF로 인쇄</button></div>
           </aside>
         )}
