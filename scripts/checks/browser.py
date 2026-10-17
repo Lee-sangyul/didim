@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from .core import FAIL, PASS, WARN, Result
+from .core import FAIL, KNOWN, PASS, WARN, Result
 
 CHANNELS = ("chrome", "msedge", None)  # None = Playwright가 내려받은 chromium(설치돼 있을 때만)
 TIMEOUT_MS = 15_000
@@ -31,6 +31,13 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
     results: list[Result] = []
     problems: list[str] = []  # 콘솔 오류·페이지 예외·5xx 응답
 
+    def known_issue(rid: str, name: str, healthy: bool, detail: str) -> None:
+        """regressions.json에 open으로 기록된 화면 결함. 고장이면 KNOWN, 고쳐졌으면 갱신하라고 알린다."""
+        if healthy:
+            results.append(Result(f"[브라우저] {rid} {name}", WARN, "해결된 것으로 보임 — regressions.json의 status를 fixed로 바꾸세요"))
+        else:
+            results.append(Result(f"[브라우저] {rid} {name}", KNOWN, detail))
+
     def step(name: str, fn: Callable[[], None]) -> bool:
         try:
             fn()
@@ -48,7 +55,10 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
             return [Result("[브라우저] 브라우저 실행", FAIL, str(exc))]
         results.append(Result("[브라우저] 브라우저 실행", PASS, channel))
 
-        context = browser.new_context(viewport={"width": 1280, "height": 800}, locale="ko-KR")
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 800}, locale="ko-KR",
+            permissions=["clipboard-read", "clipboard-write"],  # 답변 복사 단계용
+        )
         context.set_default_timeout(TIMEOUT_MS)
         page = context.new_page()
         # 로그인 전 세션 확인(/api/auth/me)과 잘못된 비밀번호는 401이 정상이다.
@@ -201,6 +211,48 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
 
         step("이전 버전으로 이동", version_nav)
 
+        # ---- 화면 보조 동작 (상담 화면을 컴포넌트로 나눈 뒤에도 그대로 동작해야 한다)
+        def copy_answer():
+            bubble_assistants.last.locator("button.copy-btn").click()
+            expect(page.locator(".error")).to_contain_text("복사되었습니다")
+
+        step("답변 복사 → 안내 문구 표시", copy_answer)
+
+        def dark_mode():
+            page.get_by_role("button", name="🌙").click()
+            expect(page.locator("header.titlebar")).to_have_class(re.compile("dark-mode"))
+            expect(page.locator(".layout")).to_have_class(re.compile("dark-mode"))
+            page.get_by_role("button", name="☀️").click()
+            expect(page.locator(".layout")).not_to_have_class(re.compile("dark-mode"))
+
+        step("다크 모드 켜기/끄기", dark_mode)
+
+        def panel_resize():
+            layout = page.locator(".layout")
+            rail_before = layout.evaluate("e => e.style.getPropertyValue('--rail-width')")
+            page.locator(".rail-resizer").focus()
+            page.keyboard.press("ArrowRight")
+            assert layout.evaluate("e => e.style.getPropertyValue('--rail-width')") != rail_before, "목록 너비가 변하지 않음"
+
+            page.locator(".aside-resizer").focus()
+            page.keyboard.press("Home")
+            expect(page.locator("aside.aside")).to_have_class(re.compile("aside-minimized"))
+            assert layout.evaluate("e => e.style.getPropertyValue('--aside-width')") == "0px"
+
+            # 최소화된 패널의 복원 버튼을 실제 마우스 클릭으로 눌러 본다 (Playwright가 가려짐도 확인한다)
+            page.locator(".aside-restore-btn").click()
+            assert layout.evaluate("e => e.style.getPropertyValue('--aside-width')") == "332px", "기본 너비로 복원되지 않음"
+
+        step("패널 너비 키보드 조절(목록, 결과창 최소화 후 복원 버튼 클릭)", panel_resize)
+
+        def aside_toggle():
+            page.get_by_role("button", name="결과 접기").click()
+            expect(page.locator("aside.aside")).to_have_count(0)
+            page.get_by_role("button", name="결과 보기").click()
+            expect(page.locator("aside.aside")).to_have_count(1)
+
+        step("결과창 접기/보기", aside_toggle)
+
         # ---- 첨부
         def attachment():
             page.locator("input.file-hidden").set_input_files(
@@ -245,7 +297,13 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
             m.locator("button.login-submit").click()
             expect(m.locator(".input textarea")).to_be_visible()
             overflow = m.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
+            menu_covered = m.evaluate(
+                """() => { const b = document.querySelector('.menu-btn'); const r = b.getBoundingClientRect();
+                           return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) !== b; }"""
+            )
             ctx.close()
+            known_issue("R022", "폭 375px에서 ☰(상담 목록) 버튼을 누를 수 있음", not menu_covered,
+                        "☰ 버튼이 .aside-resizer에 가려져 탭할 수 없음(375px 폭에서 상담 목록을 열 수 없음)")
             assert overflow <= 1, f"가로 스크롤 발생({overflow}px)"
 
         step("모바일 폭(375px)에서 가로 넘침 없이 입력창 표시", mobile)

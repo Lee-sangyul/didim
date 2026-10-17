@@ -8,6 +8,12 @@ from .core import FRONTEND
 
 SRC = FRONTEND / "src"
 
+
+def source_files(*suffixes: str):
+    """src 아래 모든 소스 파일 (하위 폴더 포함). 파일을 폴더로 나눠도 점검에서 빠지지 않게 한다."""
+    suffixes = suffixes or (".ts", ".tsx")
+    return sorted(p for p in SRC.rglob("*") if p.suffix in suffixes and not p.name.endswith(".d.ts"))
+
 # CSS 규칙이 없어도 되는 클래스(상태 표시·스크립트 훅 등). 필요하면 근거와 함께 추가한다.
 UNSTYLED_OK: set[str] = set()
 
@@ -20,7 +26,7 @@ def _strip_css(text: str) -> str:
 
 def css_classes() -> set[str]:
     found: set[str] = set()
-    for path in (SRC / "styles").glob("*.css"):
+    for path in (SRC / "styles").rglob("*.css"):  # styles/app/ 같은 하위 폴더 포함
         found |= set(re.findall(r"\.([A-Za-z_][\w-]*)", _strip_css(path.read_text("utf-8"))))
     return found
 
@@ -45,7 +51,7 @@ def _class_name_exprs(source: str):
 def used_classes() -> dict[str, set[str]]:
     """클래스 -> 쓰인 파일들. 동적 부분(${...})은 버리고 정적 토큰만 취한다."""
     used: dict[str, set[str]] = {}
-    for path in SRC.glob("*.tsx"):
+    for path in source_files(".tsx"):
         for expr in _class_name_exprs(path.read_text("utf-8")):
             literals = re.findall(r"`([^`]*)`|\"([^\"]*)\"|'([^']*)'", expr)
             chunks = [next(x for x in lit if x != "") for lit in literals if any(lit)] or [expr]
@@ -65,7 +71,7 @@ def undefined_classes() -> dict[str, list[str]]:
 def dead_state() -> list[str]:
     """useState의 값 또는 setter가 선언 외에 쓰이지 않는 경우 (미완성 기능의 흔적)."""
     problems: list[str] = []
-    for path in SRC.glob("*.tsx"):
+    for path in source_files():
         text = path.read_text("utf-8")
         for m in re.finditer(r"const \[(\w+),\s*(set\w+)\]\s*=\s*useState", text):
             value, setter = m.group(1), m.group(2)
@@ -77,23 +83,41 @@ def dead_state() -> list[str]:
 
 
 def send_min_length() -> int | None:
-    """App.tsx에서 전송 버튼이 막히는 최소 글자 수(`input.trim().length < N`)."""
-    text = (SRC / "App.tsx").read_text("utf-8")
+    """전송 버튼이 열리는 최소 글자 수(workspace/constants.ts의 MIN_MESSAGE_LENGTH)."""
+    path = SRC / "workspace" / "constants.ts"
+    text = path.read_text("utf-8") if path.exists() else ""
     m = re.search(r"MIN_MESSAGE_LENGTH\s*=\s*(\d+)", text)
     return int(m.group(1)) if m else None
+
+
+def inline_style_blocks() -> list[tuple[str, str]]:
+    """(파일, style={{ ... }} 안의 내용) 목록. 템플릿 문자열 안의 }도 올바르게 처리한다."""
+    found: list[tuple[str, str]] = []
+    for path in source_files(".tsx"):
+        text = path.read_text("utf-8")
+        for m in re.finditer(r"style=\{\{", text):
+            depth, i = 2, m.end()
+            while i < len(text) and depth > 0:
+                depth += (text[i] == "{") - (text[i] == "}")
+                i += 1
+            found.append((path.name, text[m.end(): i - 2]))
+    return found
 
 
 def inline_style_count() -> int:
     """JSX 인라인 style={{ ... }} 개수. 디자인 토큰·다크 모드와 어긋나기 쉬워 0으로 유지한다.
 
-    예외: 데이터에서 계산되는 너비(`style={{ width: `${...}%` }}`, 게이지 막대)는 CSS로 표현할 수 없어 허용한다.
+    예외(CSS로 표현할 수 없는, 실행 중에 계산되는 값):
+    - 게이지 막대의 너비 `width: `${score}%``
+    - 패널 너비를 CSS 변수로 넘기는 `"--aside-width"`, `"--rail-width"` 등(`"--`로 시작하는 키)
     """
     total = 0
-    for path in SRC.glob("*.tsx"):
-        for m in re.finditer(r"style=\{\{([^}]*)\}\}", path.read_text("utf-8")):
-            if re.fullmatch(r"\s*width:\s*`\$\{[^}]+\}%`\s*", m.group(1)):
-                continue
-            total += 1
+    for _name, body in inline_style_blocks():
+        if re.fullmatch(r"\s*width:\s*`\$\{[^}]+\}%`\s*", body):
+            continue
+        if re.search(r'"--[\w-]+"\s*:', body):
+            continue
+        total += 1
     return total
 
 
