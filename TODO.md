@@ -41,7 +41,6 @@
 - [x] ~~`App.tsx` 분리~~ — 완료(2026-10). `workspace/` 폴더 구조는 AGENTS.md "프런트엔드 구조" 참고
 - [ ] `frontend/src/workspace/hooks/useWorkspace.ts`가 가장 큼(약 380줄). 늘어나면 상담 목록/메시지 전송/첨부로 나눌 것
 - [ ] `frontend/src/CitationCards.tsx`는 분리 작업에서 옮기지 않았음(`components/`로 옮길지 결정)
-- [ ] **R022(CSS 담당)**: 폭 375px에서 ☰(상담 목록) 버튼이 `.aside-resizer`에 가려져 눌리지 않음. 390px 이상은 정상. 브라우저 E2E가 KNOWN으로 표시
 - [ ] 루트 `test_didim.py`를 `backend/tests/`의 pytest로 병합 (지금은 수정하지 않고 `check.py`가 호출만 함)
 - [ ] `SESSION_SECRET`은 설정만 있고 코드에서 쓰이지 않음 — 제거하거나 용도를 정할 것
 

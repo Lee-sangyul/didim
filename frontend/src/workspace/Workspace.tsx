@@ -13,6 +13,7 @@ import MessageThread from "./components/MessageThread";
 import PrintReport from "./components/PrintReport";
 import ResultPanel from "./components/ResultPanel";
 import TitleBar from "./components/TitleBar";
+import { MOBILE_MAX_WIDTH } from "./constants";
 import { exportPrint } from "./format";
 import { useAutoGrowTextarea } from "./hooks/useAutoGrowTextarea";
 import { useBookmarks } from "./hooks/useBookmarks";
@@ -35,7 +36,8 @@ export default function Workspace({ user, onLoggedOut }: WorkspaceProps) {
   const { asideWidth, setAsideWidth, railWidth, railResizerProps, asideResizerProps } = usePanelResize();
 
   // 화면 전용 상태 (서버와 무관)
-  const [aside, setAside] = useState(true); // 오른쪽 결과 패널 열림
+  // 오른쪽 결과 패널 열림. 폰 폭에서는 패널이 화면을 덮는 오버레이라서 닫힌 채로 시작한다(☰·입력창 가림 방지, R022).
+  const [aside, setAside] = useState(() => window.innerWidth > MOBILE_MAX_WIDTH);
   const [railOpen, setRailOpen] = useState(false); // 좁은 화면에서 왼쪽 목록 열림
   const [darkMode, setDarkMode] = useState(false);
 

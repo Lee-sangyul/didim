@@ -35,6 +35,10 @@ export const TEXTAREA_MAX_LINES = 5;
 // 전송 가능한 최소 글자 수. 백엔드 ChatInput.min_length와 같아야 한다(scripts R009가 점검).
 export const MIN_MESSAGE_LENGTH = 1;
 
+// 이 폭(px) 이하는 "폰 레이아웃"이다. 결과 패널이 화면을 덮는 오버레이가 되므로 닫힌 채로 시작한다(R022).
+// CSS의 `@media (max-width: 700px)`(styles/app/responsive.css, panel-resize.css)와 같은 값이어야 한다.
+export const MOBILE_MAX_WIDTH = 700;
+
 // 좌우 패널 기본 너비(px)
 export const DEFAULT_RAIL_WIDTH = 248;
 export const DEFAULT_ASIDE_WIDTH = 332;
