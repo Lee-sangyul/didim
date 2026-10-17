@@ -64,7 +64,8 @@
 - 채팅은 SSE(`delta` → `done` | `error`)다. 이벤트 모양을 바꾸면 `frontend/src/api.ts`의 `streamChat`과 함께 고친다.
 - `frontend/dist`와 `frontend/tsconfig.tsbuildinfo`는 **git에 추적된다**(배포 화면이 이 폴더다). 개발 중에는 `npm run build`가 이 파일들을 바꾸므로 커밋하지 말고 되돌린다. **릴리스 직전에만** `dist`를 지우고 다시 빌드해 커밋한다(R011). 빌드 확인은 `python scripts/check.py --only frontend`가 임시 위치에서 한다.
 - 스타일은 `frontend/src/styles/*.css`와 디자인 토큰(`tokens.css`의 `var(--...)`)으로만 쓴다. 인라인 `style={{}}`은 금지(데이터로 계산되는 게이지 너비만 예외), 하드코딩 색도 다크 모드에서 깨진다(R015). className을 쓰면 CSS 규칙도 반드시 만든다(R006).
-- `frontend/src/App.tsx`는 매우 크고 여러 사람이 동시에 수정한다. 변경은 작게, 관련 없는 정리·포맷 변경은 하지 않는다.
+- 상담 화면은 역할별 파일로 나뉘어 있다. **"어디에 무엇을 둘지"는 아래 "프런트엔드 구조"를 따른다.** 새 기능을 `Workspace.tsx` 한 곳에 계속 덧붙이지 않는다(예전 `App.tsx`가 1,200줄이 된 이유다).
+- 변경은 작게, 관련 없는 정리·포맷 변경은 하지 않는다.
 
 **환경**
 - 학생 PC는 대부분 **Windows**다. 경로 구분자·인코딩(UTF-8)·셸 차이를 고려한다. `start.ps1`은 UTF-8 **BOM**이 있다. 편집 후에도 BOM과 줄바꿈 방식을 유지한다.
@@ -86,7 +87,10 @@ backend/app/
   models.py          메인 DB 모델
 backend/migrations/  alembic (Postgres 전용)
 backend/tests/       pytest. 외부 호출 없음
-frontend/src/        React + TypeScript (Vite). styles/ 아래에 CSS 분리
+frontend/src/        React + TypeScript (Vite)
+  App.tsx            로그인 상태 확인 → 로그인 화면 또는 상담 화면 분기만
+  workspace/         상담 화면 (구조는 아래 "프런트엔드 구조" 참고)
+  styles/            CSS (여러 파일로 분리. 담당자가 따로 있을 수 있음)
 data/legal/          articles.json(커밋), legal.db(생성물, 미커밋), raw/(원본 응답, 키 치환됨)
 json/                위험도 평가 프롬프트 설정(program_config.json 등)
 scripts/             check.py(릴리스 점검), regressions.json(결함 목록)
@@ -95,6 +99,43 @@ test_didim.py        기존 API 테스트(수정하지 말고 호출만; 추후 
 ```
 
 실행: `start.sh` / `start.bat` / `start.ps1`. 백엔드 `:8000`, 프런트(Vite) `:5173`이 `/api`를 8000으로 프록시한다.
+
+### 프런트엔드 구조 (`frontend/src/workspace/`)
+
+```
+Workspace.tsx         조립만 한다: 훅을 부르고, 화면 조각에 값을 나눠 주고, 화면 전용 상태(패널 열림·다크 모드)를 가진다
+constants.ts          상수 (위험도 라벨, 입력창 최대 줄 수, 최소 글자 수 …)
+format.tsx            값을 다듬는 순수 함수 (마크다운 간이 렌더링, 용량·날짜 표시, 인쇄)
+versions.ts           답변 "다시 생성" 버전 계산
+hooks/
+  useWorkspace.ts     서버 데이터와 동작 전부 (상담·메시지·평가·첨부, 전송·재생성·삭제·업로드·로그아웃)
+  useThreadScroll.ts  대화 스크롤과 "↓ 새 답변" 버튼
+  useAutoGrowTextarea.ts  입력창이 줄 수에 맞춰 늘어남
+  useVoiceInput.ts    음성 입력(Web Speech API)
+  useBookmarks.ts     북마크(브라우저 저장)
+  usePanelResize.ts   좌우 패널 너비 조절
+components/           화면 조각. 받은 props만 그린다
+  TitleBar, CaseRail, ChatHeader, MessageThread → MessageItem, Composer, ResultPanel, PrintReport
+```
+
+| 새로 만들 것 | 둘 곳 |
+| --- | --- |
+| 서버 API 호출·서버 데이터 상태 | `frontend/src/workspace/hooks/useWorkspace.ts` (호출 함수는 `frontend/src/api.ts`에 만든다) |
+| 브라우저 기능(음성·저장소·스크롤·크기 측정) | `frontend/src/workspace/hooks/`에 기능별 `use*.ts` 하나 |
+| 화면에 보이는 JSX | `frontend/src/workspace/components/` (props만 받는다. **컴포넌트에서 `api.ts`를 부르지 않는다**) |
+| 상수·매직 넘버 | `frontend/src/workspace/constants.ts` |
+| 화면 전용 상태(패널 열림 등) | `frontend/src/workspace/Workspace.tsx` |
+
+- `useWorkspace.ts`나 한 컴포넌트가 각각 400줄·150줄을 넘으면 더 쪼갠다. `Workspace.tsx`는 조립 외의 로직이 늘면 훅으로 뺀다.
+- **`className`과 DOM 구조를 바꾸면 CSS가 깨진다.** 바꿀 때는 CSS(`frontend/src/styles/`)와 짝을 맞추고, 순수 리팩터링이면 화면 구조(DOM)가 그대로인지 확인한다.
+- 전송 최소 글자 수(`MIN_MESSAGE_LENGTH`)와 로그인 시도 한도는 백엔드와 같아야 한다(R009, R019).
+
+### 동시 작업 (여러 에이전트·사람이 같은 저장소를 쓸 때)
+
+- **자기 작업 범위의 파일만 고친다.** 특히 `frontend/src/styles/**`는 CSS 담당이 따로 작업 중일 수 있다. JSX 작업 중 새 `className`이 필요하면 CSS를 직접 만들지 말고 CSS 담당에게 알린다(TODO.md나 작업 보고에 적는다).
+- **작업 트리에 낯선 변경(`git status`의 수정·미추적 파일)이 있으면 건드리지 않는다.** 되돌리거나 `stash`하거나 지우지 않고 사용자에게 알린다. 그 변경은 다른 작업자의 미커밋 작업일 수 있다.
+- 여러 작업이 겹칠 수 있으면 **`git worktree`로 격리해서 작업**한다(`git worktree add <폴더> -b <브랜치>`). 병합 전에 최신 `main`을 가져와 충돌을 확인한다.
+- 점검 스크립트(`scripts/checks/frontend_static.py`)는 하위 폴더까지 읽는다. 파일을 폴더로 나눠도 점검에서 빠지지 않는다.
 
 ## 5. 변경 유형별로 확인할 것
 

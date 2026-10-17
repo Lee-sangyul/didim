@@ -264,6 +264,18 @@
       "fix": "config.env_str()/read_bool()이 빈 값을 미설정으로 처리(DATABASE_URL이 비면 로컬 SQLite)",
       "check": "r021_empty_env_values_use_defaults",
       "refs": "backend/app/config.py"
+    },
+    {
+      "id": "R022",
+      "title": "폭 375px(작은 휴대폰)에서 ☰(상담 목록) 버튼이 가려져 눌리지 않음",
+      "area": "frontend",
+      "status": "open",
+      "severity": "major",
+      "symptom": "폭 375px에서 상담 목록을 열 수 없다(다른 상담으로 이동·새 상담 시작 불가). 390px, 700px, 데스크톱은 정상",
+      "root_cause": "커밋 d4dd53f(패널 너비 조절 추가)로 생긴 .aside-resizer가 375px 폭에서 ☰ 버튼 위를 덮는다. elementFromPoint가 버튼이 아니라 aside-resizer를 가리키고 Playwright 클릭도 가로채임",
+      "fix": "CSS 수정(좁은 화면에서는 .aside-resizer를 숨기거나 z-index/영역 조정). CSS는 별도 담당이 작업 중이므로 그쪽에서 처리",
+      "check": null,
+      "refs": "frontend/src/styles/ (panel-resize), 브라우저 E2E가 KNOWN으로 표시"
     }
   ]
 }
