@@ -20,7 +20,7 @@ def _strip_css(text: str) -> str:
 
 def css_classes() -> set[str]:
     found: set[str] = set()
-    for path in (SRC / "styles").glob("*.css"):
+    for path in (SRC / "styles").rglob("*.css"):
         found |= set(re.findall(r"\.([A-Za-z_][\w-]*)", _strip_css(path.read_text("utf-8"))))
     return found
 

@@ -1,0 +1,199 @@
+/* 접힌 상담 결과 패널 다시 열기 */
+.aside-reopen-btn {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+
+  width: 28px;
+  height: 64px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 25px;
+  font-weight: 600;
+  cursor: pointer;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.aside-reopen-btn:hover {
+  background: var(--hover-soft);
+}
+
+.aside-reopen-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+/* 상담 결과창 너비 조절: 최종 규칙
+   투명한 드래그 영역을 viewport 기준으로 고정해 패널 내용 높이에 영향받지 않게 한다. */
+.layout {
+  grid-template-columns: var(--rail-width, 248px) minmax(0, 1fr) var(--aside-width, 332px);
+  height: 100%;
+  min-height: 0;
+}
+
+.layout.aside-closed {
+  grid-template-columns: var(--rail-width, 248px) minmax(0, 1fr);
+}
+
+.aside {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  align-self: stretch;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+/* 화면 위쪽 타이틀바 바로 아래부터 화면 맨 아래까지. 선과 영역은 투명하지만 드래그 가능 */
+.aside-resizer {
+  position: fixed;
+  top: 38px;
+  bottom: 0;
+  right: calc(var(--aside-width, 332px) - 5px);
+  left: auto;
+  width: 10px;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  display: block;
+  z-index: 100;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+  background: transparent;
+}
+
+.aside-resizer::before {
+  content: none;
+}
+
+.aside.aside-minimized {
+  border-left: 0;
+}
+
+.aside-minimized > :not(.aside-resizer):not(.aside-restore-btn) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.aside-restore-btn {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 110;
+  width: 28px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  background: #fff;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0001;
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: var(--rail-width, 210px) minmax(0, 1fr) var(--aside-width, 300px);
+  }
+
+  .layout.aside-closed {
+    grid-template-columns: var(--rail-width, 210px) minmax(0, 1fr);
+  }
+
+  .aside {
+    position: relative;
+    inset: auto;
+    width: auto;
+    height: 100%;
+    z-index: auto;
+    box-shadow: none;
+  }
+
+  .aside-resizer {
+    display: block;
+    position: fixed;
+    top: 38px;
+    bottom: 0;
+    right: calc(var(--aside-width, 300px) - 5px);
+    left: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .layout,
+  .layout.aside-closed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside:not(.aside-minimized) {
+    position: fixed;
+    right: 0;
+    top: 38px;
+    bottom: 0;
+    height: auto;
+    width: min(92vw, var(--aside-width, 340px));
+    z-index: 5;
+    box-shadow: -12px 0 30px #0002;
+  }
+
+  .aside-resizer {
+    position: fixed;
+    top: 38px;
+    bottom: 0;
+    right: calc(var(--aside-width, 340px) - 5px);
+    left: auto;
+    display: block;
+  }
+}
+
+
+/* 최근 상담 목록과 채팅창 사이의 전체 높이 드래그 영역 */
+.rail-resizer {
+  position: fixed;
+  top: 38px;
+  bottom: 0;
+  left: calc(var(--rail-width, 248px) - 5px);
+  width: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 101;
+  outline: none;
+}
+
+.rail-resizer:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: -2px;
+}
+
+@media (max-width: 700px) {
+  .rail-resizer {
+    display: none;
+  }
+}

@@ -1,0 +1,64 @@
+/* 새 답변 알림 버튼: 스크롤이 위쪽일 때 대화 하단에 떠서 맨 아래로 이동시킨다 (CSS 분리 중 소실되어 복구) */
+.new-answer-btn {
+  position: sticky;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  animation: new-answer-pop 0.2s ease-out;
+}
+
+.new-answer-btn:hover {
+  background: var(--hover-soft);
+}
+
+@keyframes new-answer-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* 답변 버전 이동(< 2/3 >): 다시 생성한 답변이 둘 이상일 때 표시 */
+.version-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11.5px;
+}
+
+.version-nav button {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.version-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -1,0 +1,71 @@
+/* UI 구분선 및 개별 박스 테두리 (1px 단일 선 유지, 겹침 및 두께 증가 방지) */
+.titlebar {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.rail {
+  border-right: 1px solid var(--line) !important;
+}
+
+.aside {
+  border-left: 1px solid var(--line) !important;
+}
+
+.chat-head {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.aside-head {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.composer {
+  border-top: 1px solid var(--line) !important;
+}
+
+.bubble,
+.user .bubble,
+.risk-card,
+.result > div,
+.notice,
+.attachments > div,
+.citation-card,
+.input {
+  border: 1px solid var(--line) !important;
+}
+
+.dark-mode .titlebar {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.dark-mode .rail {
+  border-right: 1px solid var(--line) !important;
+}
+
+.dark-mode .aside {
+  border-left: 1px solid var(--line) !important;
+}
+
+.dark-mode .chat-head {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.dark-mode .aside-head {
+  border-bottom: 1px solid var(--line) !important;
+}
+
+.dark-mode .composer {
+  border-top: 1px solid var(--line) !important;
+}
+
+.dark-mode .bubble,
+.dark-mode .user .bubble,
+.dark-mode .risk-card,
+.dark-mode .result > div,
+.dark-mode .notice,
+.dark-mode .attachments > div,
+.dark-mode .citation-card,
+.dark-mode .input {
+  border: 1px solid var(--line) !important;
+}
+

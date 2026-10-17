@@ -1,0 +1,245 @@
+/* ---------- 우측 패널 ---------- */
+
+.aside {
+  border-left: 1px solid var(--line);
+  background: var(--surface-aside);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.aside-head {
+  padding: 17px 20px 13px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+}
+
+.aside-head h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.aside-head small {
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+
+.aside-scroll {
+  padding: 18px 20px;
+  overflow: auto;
+  flex: 1;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  font: 11.5px ui-monospace, monospace;
+  color: var(--mute);
+}
+
+.meta b {
+  color: var(--ink);
+}
+
+section label {
+  display: block;
+  margin: 18px 0 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  color: var(--text-faint);
+}
+
+.risk {
+  --c: var(--low);
+  --cbg: var(--lowbg);
+}
+
+.risk.caution {
+  --c: var(--mid);
+  --cbg: var(--midbg);
+}
+
+.risk.danger {
+  --c: var(--danger);
+  --cbg: var(--dangerbg);
+}
+
+.risk.emergency {
+  --c: var(--emergency);
+  --cbg: var(--emergencybg);
+}
+
+.risk-card {
+  border: 1px solid var(--c);
+  border-radius: 11px;
+  padding: 14px;
+  background: var(--cbg);
+}
+
+.risk-card>div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.risk-card strong {
+  font-size: 19px;
+  color: var(--c);
+}
+
+.risk-card b {
+  font: 12px ui-monospace, monospace;
+  color: var(--c);
+}
+
+.gauge {
+  height: 8px;
+  border-radius: 8px;
+  background: var(--gauge-track);
+  margin: 11px 0;
+  overflow: hidden;
+}
+
+.gauge i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+  transition: .3s;
+}
+
+.risk-card p,
+.result div,
+.notice {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.result div,
+.notice {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 13px;
+}
+
+.result ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.result li {
+  margin: 6px 0;
+}
+
+.law-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.law-list li {
+  margin: 4px 0;
+}
+
+.notice {
+  margin-top: 18px;
+  color: var(--mute);
+}
+
+.notice b {
+  color: var(--accent);
+}
+
+.notice p {
+  margin: 5px 0 0;
+}
+
+.attachments>div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 13px;
+}
+
+.file-hidden {
+  display: none;
+}
+
+.upload-btn {
+  width: 100%;
+  padding: 9px;
+  border: 1px dashed var(--border-input);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  color: var(--mute);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+
+.upload-btn:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.file-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.file-list a {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.file-list a:hover {
+  text-decoration: underline;
+}
+
+.file-list small {
+  color: var(--text-faint);
+  font: 11px ui-monospace, monospace;
+}
+
+.file-list button {
+  border: 0;
+  background: transparent;
+  color: var(--mute);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.aside-actions {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.aside-actions button {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+

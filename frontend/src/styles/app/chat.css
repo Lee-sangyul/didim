@@ -1,0 +1,216 @@
+/* ---------- 대화 영역 ---------- */
+
+.chat {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-chat);
+}
+
+.chat-head {
+  height: 58px;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  background: var(--surface);
+}
+
+.chat-head div {
+  min-width: 0;
+}
+
+.chat-head h1 {
+  margin: 0;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-head small {
+  color: var(--text-faint);
+  font: 10.5px ui-monospace, monospace;
+}
+
+.chat-head>span {
+  flex: 1;
+}
+
+.chat-head button,
+.aside-head button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--mute);
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  font-size: 16px;
+}
+
+.thread {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 26px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--mute);
+  margin: 80px auto;
+}
+
+.empty-logo {
+  margin: auto;
+}
+
+.empty h2 {
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.empty p {
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+
+/* ---------- 메시지 ---------- */
+
+.message {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 22px;
+  max-width: 760px;
+}
+
+.message.user {
+  flex-direction: row-reverse;
+  margin-left: auto;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user .avatar {
+  background: var(--avatar-user-bg);
+  color: var(--avatar-user-ink);
+}
+
+.bubble {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  border-top-left-radius: 4px;
+  background: var(--surface);
+  padding: 13px 15px;
+  font-size: 14px;
+  line-height: 1.66;
+}
+
+.user .bubble {
+  background: var(--bubble-user);
+  border-top-left-radius: 13px;
+  border-top-right-radius: 4px;
+}
+
+.error {
+  margin: 0 26px 8px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: var(--error-bg);
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* 복원: 이전 파일에서 .admin-registration-summary 안에 섞여 있던 값으로 추정 */
+.message-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.copy-btn,
+.bookmark-btn,
+.regenerate-btn,
+.retry-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--action-ink);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.copy-btn:hover,
+.bookmark-btn:hover,
+.regenerate-btn:hover,
+.retry-btn:hover {
+  background: var(--hover-soft);
+  color: var(--action-ink-hover);
+}
+
+.copy-btn:active,
+.bookmark-btn:active,
+.regenerate-btn:active,
+.retry-btn:active {
+  transform: scale(0.94);
+}
+
+.bookmark-btn.on {
+  color: var(--accent);
+}
+
+.copy-btn svg,
+.bookmark-btn svg,
+.regenerate-btn svg {
+  display: block;
+}
+
+.retry-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.response-time {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-right: 6px;
+}
+
+

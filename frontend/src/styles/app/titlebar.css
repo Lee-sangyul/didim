@@ -1,0 +1,72 @@
+/* ---------- 타이틀바 ---------- */
+
+.titlebar {
+  background: var(--side-bg);
+  color: var(--titlebar-ink);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+.logo-sm {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: linear-gradient(150deg, #3a9b90, var(--accent));
+  margin-right: 8px;
+}
+
+.title-space {
+  flex: 1;
+}
+
+.status {
+  font: 11px ui-monospace, monospace;
+  color: #73c8bd;
+}
+
+.current-user {
+  margin-left: 12px;
+  color: var(--titlebar-ink);
+  font-size: 11px;
+}
+
+.logout-button {
+  margin-left: 9px;
+  padding: 4px 9px;
+  border: 1px solid var(--side-line);
+  border-radius: 6px;
+  background: var(--side-bg2);
+  color: var(--side-ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.logout-button:hover:not(:disabled) {
+  background: var(--side-hover);
+}
+
+.logout-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-page-button {
+  margin-left: 9px;
+  padding: 4px 9px;
+  border: 1px solid #4a776f;
+  border-radius: 6px;
+  background: rgba(46, 125, 116, 0.18);
+  color: var(--side-accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.admin-page-button:hover {
+  border-color: #73c8bd;
+  background: rgba(46, 125, 116, 0.3);
+  color: var(--side-accent-hover);
+}
+
+

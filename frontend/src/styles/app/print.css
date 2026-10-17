@@ -1,0 +1,157 @@
+/* ---------- 인쇄용 보고서 ---------- */
+
+.report-print {
+  display: none;
+}
+
+.report-head {
+  text-align: center;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+}
+
+.report-head h1 {
+  font-size: 22px;
+  letter-spacing: 2px;
+  margin: 0 0 6px;
+}
+
+.report-head p {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #555;
+  margin: 0;
+}
+
+.report-meta {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 22px;
+  font-size: 12px;
+}
+
+.report-meta th,
+.report-meta td {
+  border: 1px solid #999;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.report-meta th {
+  background: #f2f2f2;
+  width: 15%;
+  font-weight: 600;
+}
+
+.report-meta td {
+  width: 35%;
+}
+
+.report-section {
+  margin-bottom: 18px;
+}
+
+.report-section h2 {
+  font-size: 13px;
+  letter-spacing: .5px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+  margin: 0 0 8px;
+}
+
+.report-section p,
+.report-section li {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.report-section ol,
+.report-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.report-muted {
+  color: #777;
+}
+
+.report-msg {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.report-msg b {
+  display: inline-block;
+  min-width: 48px;
+  color: #444;
+}
+
+.report-footer {
+  margin-top: 32px;
+  border-top: 1px solid #999;
+  padding-top: 14px;
+}
+
+.report-footer p {
+  font-size: 10.5px;
+  color: #555;
+  line-height: 1.7;
+}
+
+.report-signature {
+  display: flex;
+  justify-content: flex-end;
+  gap: 40px;
+  margin-top: 26px;
+}
+
+.report-signature div {
+  text-align: center;
+  font-size: 11px;
+}
+
+.report-signature span {
+  display: block;
+  margin-bottom: 28px;
+  color: #555;
+}
+
+.report-signature i {
+  display: block;
+  width: 120px;
+  border-top: 1px solid #333;
+}
+
+@page {
+  size: A4;
+  margin: 20mm;
+}
+
+@media print {
+  body {
+    padding: 0;
+    background: #fff;
+  }
+
+  .titlebar,
+  .layout {
+    display: none;
+  }
+
+  .app-shell {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .report-print {
+    display: block;
+    font-family: "Batang", "Noto Serif KR", Georgia, serif;
+    color: #1a1a1a;
+    max-width: 170mm;
+    margin: 0 auto;
+  }
+}

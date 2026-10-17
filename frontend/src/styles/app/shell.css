@@ -1,0 +1,21 @@
+/* ---------- 앱 뼈대 ---------- */
+
+.app-shell {
+  height: 100%;
+  background: var(--surface);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 38px 1fr;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 248px minmax(440px, 1fr) 332px;
+  min-height: 0;
+}
+
+.layout.aside-closed {
+  grid-template-columns: 248px 1fr;
+}
+
+
