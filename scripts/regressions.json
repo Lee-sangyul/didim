@@ -201,7 +201,7 @@
       "severity": "major",
       "symptom": "새 코드가 message.versions 등 새 컬럼을 조회하는 순간 운영 DB(Postgres)에 컬럼이 없어 오류(R003과 같은 유형)",
       "root_cause": "마이그레이션 적용과 코드 배포가 분리돼 있고 순서를 강제하는 장치가 없음",
-      "fix": "배포 절차에 '1) alembic upgrade head(운영 DB) 2) 코드 배포' 순서를 명시. 자동화 전까지 릴리스 체크리스트로 관리",
+      "fix": "경고·상태 확인은 구현됨: 서버 시작 시 DB가 뒤처졌으면 로그에 오류로 알리고 /api/health/db가 outdated를 돌려주며 `python -m scripts.migrate`로 확인·적용한다. 아직 정해지지 않은 것: 뒤처진 DB에서 기동을 거부할지, 운영 배포 절차에 마이그레이션 단계를 고정할지(TODO.md)",
       "check": null,
       "refs": "R003, backend/migrations/versions/c4d5e6f7a8b9_add_message_versions.py"
     },
@@ -240,6 +240,30 @@
       "fix": "점검이 두 값(횟수·분)을 비교한다. 바꿀 때는 양쪽을 함께 바꾼다",
       "check": "r019_login_limit_consistent",
       "refs": "backend/app/services/login_guard.py, frontend/src/loginGuard.ts"
+    },
+    {
+      "id": "R020",
+      "title": "새 DB(빈 Postgres)에서 서버를 시작하면 테이블이 없어 모든 요청이 500",
+      "area": "release",
+      "status": "fixed",
+      "severity": "major",
+      "symptom": "레포를 받아 .env(올바른 Postgres 주소)를 설정하고 start를 실행하면 서버는 뜨지만 로그인 등 DB 요청이 `relation ... does not exist`로 500. 마이그레이션 문제로 보임",
+      "root_cause": "Postgres 스키마는 alembic으로만 만들어지는데 start 스크립트·서버 시작 어디서도 적용하지 않고, README의 수동 `alembic upgrade head`만 있었다. SQLite만 시작 시 테이블을 만들었다",
+      "fix": "서버 시작 시 DB가 완전히 비어 있으면 자동으로 upgrade head(app/db_migrate.py, advisory lock으로 동시 기동 안전). 데이터가 있는 DB는 자동으로 바꾸지 않고 경고 + /api/health/db + `python -m scripts.migrate --upgrade`",
+      "check": "r020_fresh_database_gets_schema",
+      "refs": "backend/app/db_migrate.py, backend/scripts/migrate.py, backend/migrations/env.py"
+    },
+    {
+      "id": "R021",
+      "title": "값이 빈 환경변수(KEY=)가 기본값을 가려 서버가 시작되지 않음",
+      "area": "release",
+      "status": "fixed",
+      "severity": "major",
+      "symptom": ".env.example을 그대로 복사하면 DATABASE_URL이 빈 값이라 `Could not parse SQLAlchemy URL`로 서버가 죽음. MAX_UPLOAD_MB= 도 int 변환 오류",
+      "root_cause": "os.getenv(name, default)는 값이 빈 문자열이면 기본값을 쓰지 않는다",
+      "fix": "config.env_str()/read_bool()이 빈 값을 미설정으로 처리(DATABASE_URL이 비면 로컬 SQLite)",
+      "check": "r021_empty_env_values_use_defaults",
+      "refs": "backend/app/config.py"
     }
   ]
 }

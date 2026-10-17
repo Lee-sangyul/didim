@@ -320,6 +320,27 @@ def stage_server(ctx: Ctx) -> list[Result]:
             code, body = _http(opener, "POST", f"{base}/api/cases/{case_id}/chat", {"content": "학부모가 반복해서 욕설을 합니다."})
             kinds = [json.loads(b[6:])["type"] for b in body.split("\n\n") if b.startswith("data: ")]
             r.append(Result("실서버 채팅 스트리밍", PASS if code == 200 and "done" in kinds and "error" not in kinds else FAIL, f"{code} {kinds[:3]}..."))
+
+    # 처음 받은 PC처럼 **빈 Postgres**에 서버만 띄워도 스키마가 만들어지고 요청이 500이 아니어야 한다 (R020)
+    pg = ctx.postgres()
+    if pg is None:
+        r.append(Result("빈 Postgres 첫 기동(스키마 자동 준비)", WARN, f"실행하지 못함: {ctx.pg_error}"))
+        return r
+
+    pg_env = ctx.env(DATABASE_URL=pg.create_db("firstboot"))
+    with _server(ctx, pg_env, "firstboot") as (base, log_path):
+        if not base:
+            r.append(Result("빈 Postgres 첫 기동(스키마 자동 준비)", FAIL, tail(log_path.read_text(errors="replace"), 12)))
+            return r
+        opener = urllib.request.build_opener()
+        code, body = _http(opener, "GET", f"{base}/api/health/db")
+        state = json.loads(body) if code == 200 else {}
+        r.append(Result(
+            "빈 Postgres 첫 기동 시 스키마 자동 생성(/api/health/db)",
+            PASS if state.get("status") == "ready" and state.get("migrated") else FAIL, f"{code} {state}",
+        ))
+        code, _ = _http(opener, "POST", f"{base}/api/auth/login", {"username": "nobody", "password": "wrong-password"})
+        r.append(Result("빈 Postgres 첫 기동 직후 로그인 요청이 500이 아님(401)", PASS if code == 401 else FAIL, f"{code}"))
     return r
 
 
@@ -529,7 +550,11 @@ def stage_release(ctx: Ctx) -> list[Result]:
 
 def stage_regress(ctx: Ctx) -> list[Result]:
     registry = {c["id"]: c for c in json.loads((ROOT / "scripts" / "regressions.json").read_text("utf-8"))["cases"]}
-    raw = run_worker("regress", ctx.env())
+    extra: dict[str, str] = {}
+    pg = ctx.postgres()
+    if pg is not None:
+        extra["CHECK_PG_FRESH_URL"] = pg.create_db("regress_fresh")
+    raw = run_worker("regress", ctx.env(**extra))
     out: list[Result] = []
     for item in raw:
         case = registry.get(item.name)
@@ -539,7 +564,8 @@ def stage_regress(ctx: Ctx) -> list[Result]:
         label = f"{case['id']} {case['title']}"
         blocker = case.get("severity") == "blocker"
         if item.status == SKIP:
-            out.append(Result(label, SKIP, "자동 점검 없음 — " + case.get("symptom", ""), blocker=False))
+            detail = item.detail if case.get("check") else "자동 점검 없음 — " + case.get("symptom", "")
+            out.append(Result(label, SKIP, detail, blocker=False))
         elif case["status"] == "fixed":
             out.append(Result(label, PASS if item.status == PASS else FAIL, item.detail))
         elif item.status == PASS:  # open인데 통과

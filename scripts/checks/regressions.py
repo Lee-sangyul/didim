@@ -8,11 +8,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
 from . import frontend_static
-from .core import BACKEND, FAIL, FRONTEND, PASS, ROOT, Result
+from .core import BACKEND, FAIL, FRONTEND, PASS, ROOT, SKIP, Result
 
 REGISTRY = ROOT / "scripts" / "regressions.json"
 
@@ -26,7 +27,7 @@ def env_example_missing() -> list[str]:
     """config.py가 읽는 환경변수 중 .env.example에 문서화되지 않은 것."""
     names: set[str] = set()
     for path in (BACKEND / "app").rglob("*.py"):
-        names |= set(re.findall(r"(?:getenv|read_bool|environ\.get)\(\s*[\"']([A-Z][A-Z0-9_]+)[\"']", _read(path)))
+        names |= set(re.findall(r"(?:getenv|env_str|read_bool|environ\.get)\(\s*[\"']([A-Z][A-Z0-9_]+)[\"']", _read(path)))
     documented = set(re.findall(r"^\s*#?\s*([A-Za-z][A-Za-z0-9_]*)\s*=", _read(ROOT / ".env.example"), flags=re.M))
     return sorted(names - documented)
 
@@ -293,6 +294,58 @@ def r019_login_limit_consistent():
     return server == client, f"서버(횟수, 분)={server}, 브라우저={client}"
 
 
+def r020_fresh_database_gets_schema():
+    """빈 Postgres에서 서버가 시작될 때 스키마가 만들어지고, 이미 있는 DB는 건드리지 않는다. (Postgres 필요)"""
+    url = os.environ.get("CHECK_PG_FRESH_URL")
+    if not url:
+        return None, "Postgres가 없어 건너뜀 (임시 Postgres가 있을 때만 점검)"
+
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from app import db_migrate
+
+    engine = create_engine(url)
+    first = db_migrate.ensure_schema(engine)
+    again = db_migrate.ensure_schema(engine)
+
+    command.downgrade(db_migrate.alembic_config(engine), "-1")  # 뒤처진 DB를 만든다
+    behind = db_migrate.ensure_schema(engine)
+    still_behind = db_migrate.schema_state(engine)["status"]
+
+    ok = (
+        first["status"] == "ready" and first.get("migrated") is True
+        and again["status"] == "ready" and not again.get("migrated")
+        and behind["status"] == "outdated" and still_behind == "outdated"  # 자동으로 올리지 않는다
+    )
+    return ok, f"빈 DB -> {first['status']}(자동 생성), 재시작 -> {again['status']}, 뒤처진 DB -> {behind['status']}(그대로 둠)"
+
+
+def r021_empty_env_values_use_defaults():
+    """.env.example을 복사한 직후처럼 값이 빈 설정이 기본값을 가리지 않는다."""
+    from app.config import load_settings
+
+    keys = ["DATABASE_URL", "MAX_UPLOAD_MB", "REGISTRATION_MAX_UPLOAD_MB", "FRONTEND_ORIGINS", "ANTHROPIC_MODEL",
+            "UPLOAD_DIR", "SUPABASE_STORAGE_BUCKET", "DEMO_MODE", "LEGAL_CITATIONS_ENABLED"]
+    saved = {k: os.environ.get(k) for k in keys}
+    try:
+        for k in keys:
+            os.environ.pop(k, None)
+        baseline = load_settings()
+        for k in keys:
+            os.environ[k] = ""
+        blank = load_settings()
+    except Exception as exc:
+        return False, f"빈 값으로 설정을 읽는 중 예외: {type(exc).__name__}: {exc}"
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    return blank == baseline, "빈 값 = 기본값" if blank == baseline else "빈 값이 기본값을 가림"
+
+
 # ------------------------------------------------------------------ 실행
 def run_all() -> list[Result]:
     cases = json.loads(REGISTRY.read_text("utf-8"))["cases"]
@@ -306,5 +359,6 @@ def run_all() -> list[Result]:
             ok, detail = func()
         except Exception as exc:  # 점검 자체의 오류는 해당 사례의 실패로 기록
             ok, detail = False, f"점검 중 예외: {type(exc).__name__}: {exc}"
-        results.append(Result(case["id"], PASS if ok else FAIL, detail))
+        status = SKIP if ok is None else (PASS if ok else FAIL)  # None = 이 환경에서는 점검할 수 없음
+        results.append(Result(case["id"], status, detail))
     return results

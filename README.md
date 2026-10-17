@@ -92,16 +92,20 @@ cd backend
 
 macOS/Linux에서는 설정을 마친 후 레포 루트의 `./start.sh`로 의존성 설치와 두 서버 실행을 한 번에 할 수도 있습니다.
 
-### PostgreSQL을 사용하는 경우
+### 데이터베이스 설정
 
-`DATABASE_URL`을 유효한 `postgresql+psycopg://...` 주소로 설정하고, **계정 생성 및 API 사용 전에** 레포의 마이그레이션을 적용합니다.
+- **`DATABASE_URL`을 비워 두면**(`.env.example` 그대로) 로컬 SQLite(`data/didim.db`)를 씁니다. 테이블은 서버가 시작할 때 만들어집니다.
+- **PostgreSQL을 쓰려면** `DATABASE_URL`에 `postgresql+psycopg://...` 주소를 넣습니다.
+  - **완전히 비어 있는 DB**면 서버가 시작할 때 마이그레이션을 **자동으로 처음 한 번** 적용합니다. 따로 할 일이 없습니다.
+  - **이미 데이터가 있는 DB**는 자동으로 바꾸지 않습니다. 코드가 더 새로우면 서버 로그에 경고가 뜨고 `/api/health/db`가 `outdated`를 알려 줍니다. 그때 직접 적용하세요(어느 폴더에서 실행해도 됩니다).
 
 ```bash
 cd backend
-../.venv/bin/python -m alembic upgrade head
+../.venv/bin/python -m scripts.migrate              # 상태만 확인 (DB를 바꾸지 않음)
+../.venv/bin/python -m scripts.migrate --upgrade    # 최신으로 적용
 ```
 
-Windows에서는 위 명령의 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요. 운영 DB 연결 정보는 `.env`에만 보관하세요.
+Windows에서는 위 명령의 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요. `python -m alembic upgrade head`(`backend/`에서)도 같은 일을 합니다. 운영 DB 연결 정보는 `.env`에만 보관하세요.
 
 ## Claude 및 법령 검색
 
