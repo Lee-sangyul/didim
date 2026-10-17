@@ -198,7 +198,8 @@ python scripts/check.py -v               # 통과 항목의 상세도 출력
 
 | 경로 | 내용 |
 | --- | --- |
-| `frontend/src/App.tsx` | 상담 화면과 인쇄용 보고서 |
+| `frontend/src/App.tsx` | 로그인 상태 확인과 화면 분기 |
+| `frontend/src/workspace/` | 상담 화면: `Workspace.tsx`(조립), `hooks/`(서버 데이터·동작), `components/`(화면 조각) |
 | `frontend/src/RegistrationPage.tsx` | 교직원 계정 신청 |
 | `frontend/src/AdminRegistrationPage.tsx` | 관리자 신청 심사 |
 | `backend/app/main.py` | 앱 생성·라우터 등록·시작 시 초기화 |
