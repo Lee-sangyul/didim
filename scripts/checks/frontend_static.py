@@ -103,3 +103,80 @@ def login_guard_limits() -> tuple[int | None, int | None]:
     mf = re.search(r"MAX_FAILURES\s*=\s*(\d+)", text)
     wm = re.search(r"WINDOW_MINUTES\s*=\s*(\d+)", text)
     return (int(mf.group(1)) if mf else None, int(wm.group(1)) if wm else None)
+
+
+# ------------------------------------------------------------------ CSS 구조 (styles/app/ 분할)
+STYLES = SRC / "styles"
+
+
+def css_import_problems() -> list[str]:
+    """app.css는 styles/app/*.css를 @import 하는 목차다. 누락·중복·없는 파일은 화면 스타일 소실로 이어진다."""
+    index = (STYLES / "app.css").read_text("utf-8")
+    imported = re.findall(r"@import\s+['\"]\./app/([\w.-]+\.css)['\"]\s*;", _strip_comments(index))
+    problems = [f"{n}: @import가 {imported.count(n)}번" for n in sorted(set(imported)) if imported.count(n) > 1]
+    problems += [f"{n}: 파일 없음" for n in imported if not (STYLES / "app" / n).exists()]
+    on_disk = {p.name for p in (STYLES / "app").glob("*.css")}
+    problems += [f"{n}: app.css에서 import하지 않음" for n in sorted(on_disk - set(imported))]
+    rules = re.sub(r"@import[^;]*;", "", _strip_comments(index)).strip()
+    if rules:
+        problems.append("app.css에 @import 외의 규칙이 있음 (목차로만 쓴다)")
+    return problems
+
+
+def _strip_comments(text: str) -> str:
+    return re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+
+
+def _block(text: str, selector: str) -> str:
+    """`selector {` 로 시작하는 최상위 블록의 본문(중괄호 균형)."""
+    m = re.search(rf"(?m)^{re.escape(selector)}\s*\{{", text)
+    if not m:
+        return ""
+    depth, i = 1, m.end()
+    while i < len(text) and depth:
+        depth += (text[i] == "{") - (text[i] == "}")
+        i += 1
+    return text[m.end() : i - 1]
+
+
+def dark_mode_problems() -> list[str]:
+    """다크 모드: tokens.css의 `.dark-mode`가 기존 토큰만 덮어쓰고, 모든 var(--x)가 정의돼 있어야 한다."""
+    tokens = _strip_comments((STYLES / "tokens.css").read_text("utf-8"))
+    root_vars = set(re.findall(r"(--[\w-]+)\s*:", _block(tokens, ":root")))
+    dark_vars = set(re.findall(r"(--[\w-]+)\s*:", _block(tokens, ".dark-mode")))
+    problems: list[str] = []
+    if not root_vars:
+        problems.append("tokens.css에 :root 토큰이 없음")
+    if not dark_vars:
+        problems.append("tokens.css에 .dark-mode 토큰 블록이 없음")
+    if dark_vars - root_vars:
+        problems.append(f".dark-mode에만 있는 토큰: {sorted(dark_vars - root_vars)}")
+    declared = root_vars | dark_vars
+    used: dict[str, set[str]] = {}
+    for path in STYLES.rglob("*.css"):
+        local = set(re.findall(r"(--[\w-]+)\s*:", _strip_comments(path.read_text("utf-8"))))
+        for name in re.findall(r"var\(\s*(--[\w-]+)\s*[,)]", _strip_comments(path.read_text("utf-8"))):
+            if name not in declared and name not in local:
+                used.setdefault(name, set()).add(path.name)
+    # 레이아웃 변수(--rail-width 등)는 TSX가 런타임에 설정한다
+    runtime = set(re.findall(r"""['"`](--[\w-]+)['"`]""", "".join(p.read_text("utf-8") for p in SRC.glob("*.tsx"))))
+    runtime |= set(re.findall(r"(--[\w-]+)\s*:", "".join(p.read_text("utf-8") for p in SRC.glob("*.tsx"))))
+    for name, files in sorted(used.items()):
+        if name not in runtime:
+            problems.append(f"정의되지 않은 토큰 {name} ({', '.join(sorted(files))})")
+    return problems
+
+
+def print_problems() -> list[str]:
+    """인쇄: @page와 @media print 규칙이 있고, 화면용 UI(타이틀바·레이아웃)를 숨겨야 한다."""
+    text = _strip_comments((STYLES / "app" / "print.css").read_text("utf-8"))
+    problems: list[str] = []
+    if "@page" not in text:
+        problems.append("print.css에 @page 없음")
+    block = _block(text, "@media print")
+    if not block:
+        return problems + ["print.css에 @media print 없음"]
+    hidden = re.search(r"\.titlebar[^{]*\{[^}]*display:\s*none", block) and re.search(r"\.layout[^{]*\{[^}]*display:\s*none", block)
+    if not hidden:
+        problems.append("@media print에서 .titlebar/.layout을 숨기지 않음")
+    return problems

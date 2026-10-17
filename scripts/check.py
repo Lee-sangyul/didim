@@ -360,6 +360,14 @@ def stage_frontend(ctx: Ctx) -> list[Result]:
     code, out = run([npx, "--no-install", "tsc", "--noEmit", "--incremental", "false", "-p", "."], FRONTEND, env, timeout=300)
     r.append(Result("tsc 타입 검사", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 15)))
 
+    for title, func in (
+        ("CSS 분할 구조(app.css @import 목차)", frontend_static.css_import_problems),
+        ("다크 모드 토큰(.dark-mode)", frontend_static.dark_mode_problems),
+        ("인쇄 스타일(@page, @media print)", frontend_static.print_problems),
+    ):
+        problems = func()
+        r.append(Result(title, PASS if not problems else FAIL, "; ".join(problems)))
+
     dist = ctx.tmp / "dist"
     code, out = _build_frontend(ctx, dist)
     r.append(Result("vite build", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 15)))
