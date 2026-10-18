@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from .core import FAIL, KNOWN, PASS, WARN, Result
+from .core import FAIL, PASS, WARN, Result
 
 CHANNELS = ("chrome", "msedge", None)  # None = Playwright가 내려받은 chromium(설치돼 있을 때만)
 TIMEOUT_MS = 15_000
@@ -30,13 +30,6 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
 
     results: list[Result] = []
     problems: list[str] = []  # 콘솔 오류·페이지 예외·5xx 응답
-
-    def known_issue(rid: str, name: str, healthy: bool, detail: str) -> None:
-        """regressions.json에 open으로 기록된 화면 결함. 고장이면 KNOWN, 고쳐졌으면 갱신하라고 알린다."""
-        if healthy:
-            results.append(Result(f"[브라우저] {rid} {name}", WARN, "해결된 것으로 보임 — regressions.json의 status를 fixed로 바꾸세요"))
-        else:
-            results.append(Result(f"[브라우저] {rid} {name}", KNOWN, detail))
 
     def step(name: str, fn: Callable[[], None]) -> bool:
         try:
@@ -285,9 +278,9 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
         step("/register 화면(SPA 폴백)", register_route)
         context.close()
 
-        # ---- 모바일 폭
-        def mobile():
-            ctx = browser.new_context(viewport={"width": 375, "height": 812}, is_mobile=True, has_touch=True, locale="ko-KR")
+        # ---- 모바일 폭 (R022: 폰에서는 결과 패널이 화면을 덮는 오버레이라서 닫힌 채 시작해야 한다)
+        def mobile_context(width: int):
+            ctx = browser.new_context(viewport={"width": width, "height": 812}, is_mobile=True, has_touch=True, locale="ko-KR")
             ctx.set_default_timeout(TIMEOUT_MS)
             m = ctx.new_page()
             m.on("dialog", lambda d: d.accept())
@@ -296,17 +289,41 @@ def run_flow(base: str, username: str, password: str) -> list[Result]:
             m.locator("input[autocomplete=current-password]").fill(password)
             m.locator("button.login-submit").click()
             expect(m.locator(".input textarea")).to_be_visible()
-            overflow = m.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
-            menu_covered = m.evaluate(
-                """() => { const b = document.querySelector('.menu-btn'); const r = b.getBoundingClientRect();
-                           return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) !== b; }"""
+            return ctx, m
+
+        def uncovered(m, selector: str) -> bool:
+            """요소 중앙을 실제로 누를 수 있는가(다른 요소가 덮고 있지 않은가)."""
+            return m.evaluate(
+                """s => { const e = document.querySelector(s); const r = e.getBoundingClientRect();
+                          const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+                          return t === e || e.contains(t); }""",
+                selector,
             )
+
+        def mobile():
+            ctx, m = mobile_context(375)
+            overflow = m.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
             ctx.close()
-            known_issue("R022", "폭 375px에서 ☰(상담 목록) 버튼을 누를 수 있음", not menu_covered,
-                        "☰ 버튼이 .aside-resizer에 가려져 탭할 수 없음(375px 폭에서 상담 목록을 열 수 없음)")
             assert overflow <= 1, f"가로 스크롤 발생({overflow}px)"
 
         step("모바일 폭(375px)에서 가로 넘침 없이 입력창 표시", mobile)
+
+        def mobile_usable():
+            for width in (360, 375):
+                ctx, m = mobile_context(width)
+                try:
+                    assert m.locator("aside.aside").count() == 0, f"{width}px: 결과 패널이 열린 채 시작해 화면을 덮음"
+                    for selector in (".input textarea", ".send-btn", ".menu-btn"):
+                        assert uncovered(m, selector), f"{width}px: {selector}가 다른 요소에 가려져 누를 수 없음"
+                    m.locator("button.menu-btn").click()
+                    expect(m.locator(".rail")).to_have_class(re.compile("open"))
+                    m.locator(".rail-backdrop").click()
+                    m.get_by_role("button", name="결과 보기").click()
+                    expect(m.locator("aside.aside")).to_have_count(1)  # 필요할 때는 패널을 열 수 있다
+                finally:
+                    ctx.close()
+
+        step("폰 폭(360·375px): 입력창·☰가 가려지지 않고 ☰로 목록이 열리며 결과 패널은 닫힌 채 시작", mobile_usable)
 
         def no_problems():
             assert not problems, "; ".join(problems[:4])

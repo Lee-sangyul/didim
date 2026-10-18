@@ -267,15 +267,15 @@
     },
     {
       "id": "R022",
-      "title": "폭 375px(작은 휴대폰)에서 ☰(상담 목록) 버튼이 가려져 눌리지 않음",
+      "title": "폰 폭에서 결과 패널이 열린 채 시작해 화면(대화·입력창·☰)을 덮음",
       "area": "frontend",
-      "status": "open",
+      "status": "fixed",
       "severity": "major",
-      "symptom": "폭 375px에서 상담 목록을 열 수 없다(다른 상담으로 이동·새 상담 시작 불가). 390px, 700px, 데스크톱은 정상",
-      "root_cause": "커밋 d4dd53f(패널 너비 조절 추가)로 생긴 .aside-resizer가 375px 폭에서 ☰ 버튼 위를 덮는다. elementFromPoint가 버튼이 아니라 aside-resizer를 가리키고 Playwright 클릭도 가로채임",
-      "fix": "CSS 수정(좁은 화면에서는 .aside-resizer를 숨기거나 z-index/영역 조정). CSS는 별도 담당이 작업 중이므로 그쪽에서 처리",
-      "check": null,
-      "refs": "frontend/src/styles/ (panel-resize), 브라우저 E2E가 KNOWN으로 표시"
+      "symptom": "폰(≈700px 이하)에서 로그인하면 결과 패널(332px)이 화면 대부분을 덮어 대화와 입력창이 가려지고, 폭 375px 이하에서는 ☰(상담 목록) 버튼도 눌리지 않음",
+      "root_cause": "700px 이하에서 결과 패널은 화면을 덮는 오버레이(CSS)인데, 패널 열림 상태의 초기값이 항상 true였다. 패널 너비 조절 구분선(.aside-resizer)이 ☰ 위에 겹쳐 375px에서 탭이 가로채임",
+      "fix": "폰 폭(MOBILE_MAX_WIDTH=700, CSS 중단점과 동일)에서는 결과 패널을 닫은 채 시작한다. \"결과 보기\" 버튼으로 필요할 때 연다. CSS는 바꾸지 않음",
+      "check": "r022_mobile_aside_closed_by_default",
+      "refs": "frontend/src/workspace/Workspace.tsx, frontend/src/workspace/constants.ts, browser E2E \"폰 폭(360·375px)\" 단계"
     }
   ]
 }

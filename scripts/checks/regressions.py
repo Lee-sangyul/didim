@@ -346,6 +346,14 @@ def r021_empty_env_values_use_defaults():
     return blank == baseline, "빈 값 = 기본값" if blank == baseline else "빈 값이 기본값을 가림"
 
 
+def r022_mobile_aside_closed_by_default():
+    """폰 레이아웃 중단점(상수)이 CSS와 같고, 결과 패널의 초기 상태가 그 값을 쓰는가. 실제 동작은 browser 단계가 본다."""
+    const, css = frontend_static.mobile_breakpoints()
+    uses = "window.innerWidth > MOBILE_MAX_WIDTH" in _read(FRONTEND / "src" / "workspace" / "Workspace.tsx")
+    ok = const is not None and const in css and uses
+    return ok, f"MOBILE_MAX_WIDTH={const}, CSS 중단점={sorted(css)}, 초기 상태에서 사용={uses}"
+
+
 # ------------------------------------------------------------------ 실행
 def run_all() -> list[Result]:
     cases = json.loads(REGISTRY.read_text("utf-8"))["cases"]

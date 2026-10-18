@@ -121,6 +121,18 @@ def inline_style_count() -> int:
     return total
 
 
+def mobile_breakpoints() -> tuple[int | None, set[int]]:
+    """(workspace/constants.ts의 MOBILE_MAX_WIDTH, CSS에서 폰 레이아웃에 쓰는 max-width 중단점들)."""
+    const = SRC / "workspace" / "constants.ts"
+    m = re.search(r"MOBILE_MAX_WIDTH\s*=\s*(\d+)", const.read_text("utf-8")) if const.exists() else None
+    widths: set[int] = set()
+    for name in ("responsive.css", "panel-resize.css"):
+        path = STYLES / "app" / name
+        if path.exists():
+            widths |= {int(w) for w in re.findall(r"@media\s*\(max-width:\s*(\d+)px\)", path.read_text("utf-8"))}
+    return (int(m.group(1)) if m else None), widths
+
+
 def login_guard_limits() -> tuple[int | None, int | None]:
     """프런트 loginGuard.ts의 (MAX_FAILURES, WINDOW_MINUTES)."""
     text = (SRC / "loginGuard.ts").read_text("utf-8") if (SRC / "loginGuard.ts").exists() else ""
