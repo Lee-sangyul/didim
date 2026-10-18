@@ -224,3 +224,24 @@ def test_regenerate_version_limit(env, monkeypatch):
     with pytest.raises(HTTPException) as e:
         _regen(session, case, reply.id)
     assert e.value.status_code == 409
+
+
+# ---------------------------------------------------------------- DB가 뒤처졌을 때의 채팅 오류 문구 (R016)
+def test_chat_error_message_names_outdated_db_not_api_key(env, monkeypatch):
+    from app.db_migrate import OUTDATED_MESSAGE
+
+    _, session, case = env
+    _mock_llm(monkeypatch, ["답변"])
+
+    def boom(*a, **k):
+        raise RuntimeError("relation does not exist")
+
+    monkeypatch.setattr(chat_service, "_save_result", boom)
+    turn = chat_service.start_turn(session, case, "학부모가 협박했습니다.")
+
+    monkeypatch.setattr(chat_service, "outdated_by", lambda exc, engine: True)
+    assert events(turn)[-1] == {"type": "error", "message": OUTDATED_MESSAGE}
+
+    _mock_llm(monkeypatch, ["답변"])
+    monkeypatch.setattr(chat_service, "outdated_by", lambda exc, engine: False)
+    assert "API 키" in events(turn)[-1]["message"]  # DB 문제가 아니면 기존 안내 그대로

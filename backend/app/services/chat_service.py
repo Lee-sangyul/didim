@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 
 from ..config import settings
 from ..database import engine
+from ..db_migrate import OUTDATED_MESSAGE, outdated_by
 from ..demo import DemoAssessment, assess, demo_reply
 from ..legal.schemas import Citation
 from ..legal.service import find_citations
@@ -317,13 +318,11 @@ def stream_events(turn: ChatTurn) -> Iterator[str]:
             }
         )
 
-    except Exception:
-        yield sse(
-            {
-                "type": "error",
-                "message": (
-                    "AI 응답 중 오류가 발생했습니다. "
-                    "설정과 API 키를 확인하세요."
-                ),
-            }
+    except Exception as exc:
+        # DB가 뒤처져 난 오류를 "API 키를 확인하세요"로 안내하면 원인을 잘못 짚게 된다 (R016)
+        message = (
+            OUTDATED_MESSAGE
+            if outdated_by(exc, engine)
+            else "AI 응답 중 오류가 발생했습니다. 설정과 API 키를 확인하세요."
         )
+        yield sse({"type": "error", "message": message})
