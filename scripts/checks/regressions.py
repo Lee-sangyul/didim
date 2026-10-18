@@ -354,6 +354,38 @@ def r022_mobile_aside_closed_by_default():
     return ok, f"MOBILE_MAX_WIDTH={const}, CSS 중단점={sorted(css)}, 초기 상태에서 사용={uses}"
 
 
+def r016_outdated_db_fails_clearly_and_recovers():
+    """뒤처진 DB: 상태는 실시간으로 outdated, 없는 테이블 조회는 503(db_outdated), 마이그레이션 후 재시작 없이 ready. (Postgres 필요)"""
+    url = os.environ.get("CHECK_PG_OUTDATED_URL")
+    if not url:
+        return None, "Postgres가 없어 건너뜀 (임시 Postgres가 있을 때만 점검)"
+
+    from alembic import command
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.exc import DBAPIError
+
+    from app import db_errors, db_migrate
+
+    engine = create_engine(url)
+    cfg = db_migrate.alembic_config(engine)
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "c4d5e6f7a8b9")  # login_attempts 테이블이 없는 DB
+
+    behind = db_migrate.live_state(engine)["status"]
+    response = None
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT * FROM login_attempts"))
+    except DBAPIError as exc:
+        response = db_errors.outdated_db_response(exc, engine)
+
+    command.upgrade(cfg, "head")
+    after = db_migrate.live_state(engine)["status"]
+
+    ok = behind == "outdated" and response is not None and response.status_code == 503 and after == "ready"
+    return ok, f"뒤처진 DB -> {behind}, 없는 테이블 조회 -> {getattr(response, 'status_code', None)}, 적용 후 -> {after}"
+
+
 # ------------------------------------------------------------------ 실행
 def run_all() -> list[Result]:
     cases = json.loads(REGISTRY.read_text("utf-8"))["cases"]

@@ -44,7 +44,7 @@
 - `alembic`은 `.env`의 `DATABASE_URL`을 그대로 쓴다 → **그냥 실행하면 운영 DB를 건드린다.** 반드시 `DATABASE_URL`을 임시 DB로 덮어쓰고 실행한다. 마이그레이션 체인은 Postgres 전용이라 빈 SQLite에서는 실패한다(정상).
 - **서버 시작 시 DB 처리(`backend/app/db_migrate.py`)**: Postgres가 *완전히 빈 DB*면 마이그레이션을 자동 적용하고, 데이터가 있는 DB는 **절대 자동으로 바꾸지 않는다**(뒤처졌으면 로그 경고 + `/api/health/db`가 `outdated`). 이 정책을 "편의를 위해" 바꾸지 않는다. 확인·적용은 `python -m scripts.migrate [--upgrade]`(`backend/`에서, 운영 DB를 가리키면 운영 DB가 바뀌므로 승인 필요).
 - **`.env`의 빈 값(`KEY=`)은 미설정으로 취급한다**(`config.env_str`). 설정 키를 추가할 때는 `os.getenv` 대신 `env_str`/`read_bool`을 쓰고 `.env.example`에도 적는다(R013, R021).
-- **배포 순서: 운영 DB에 `alembic upgrade head`를 먼저, 코드는 그 다음.** 새 코드가 새 컬럼을 조회하는데 운영 DB에 컬럼이 없으면 조회가 깨진다(R003, R016).
+- **배포 순서: 운영 DB에 `alembic upgrade head`를 먼저, 코드는 그 다음.** 어긋나도 **서버는 기동한다(결정, 기동 거부로 바꾸지 않는다)**. 영향받는 요청만 503 `db_outdated`로 실패하고 마이그레이션 적용 즉시 재시작 없이 복구된다(`backend/app/db_errors.py`, R003, R016). 절차는 README "배포 순서".
 - 모델(`backend/app/models.py`)을 바꾸면 **같은 작업에서** alembic revision을 만든다. 서버 시작 시의 컬럼 보충(`init_sqlite_schema`)은 SQLite 전용이다(R003). `scripts/check.py`의 `migrate` 단계가 모델-마이그레이션 불일치를 잡는다.
 - 법령 검색 DB(`data/legal/legal.db`)는 메인 DB와 **별개의 SQLite 파일**이고 git에 없다. **`data/legal/articles.json`만 배포하면** 서버가 시작할 때 `backend/app/legal/bootstrap.py`가 DB를 만든다(없거나 내용이 다르면 교체). 상태는 `/api/health/legal`. 수동 복원은 `python -m app.legal.ingest --from-json`(`backend/`에서). 이 방식을 유지하기로 결정했으므로 법령 검색을 Postgres로 옮기지 않는다(R004, R012).
 - 가입 증빙 문서는 심사 후 **5년** 보관한다(`backend/app/services/retention.py`). 삭제는 `python -m scripts.purge_registration_documents`(`backend/`에서)로 하며 서버가 자동으로 부르지 않는다. 보관 기간·삭제 대상은 개인정보 정책이므로 임의로 바꾸거나 실행하지 않는다(R017).
