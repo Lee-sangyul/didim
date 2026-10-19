@@ -60,7 +60,6 @@ def isolated_env(tmp: Path, **extra: str) -> dict[str, str]:
         LAW_API_OC="",
         SUPABASE_URL="",
         SUPABASE_SECRET_KEY="",
-        SESSION_SECRET="check-only-secret",
         COOKIE_SECURE="false",
         DATABASE_URL=f"sqlite:///{(tmp / 'check.db').as_posix()}",
         UPLOAD_DIR=str(tmp / "uploads"),

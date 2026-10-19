@@ -39,7 +39,6 @@
 - [ ] `frontend/src/workspace/hooks/useWorkspace.ts`가 가장 큼(약 380줄). 늘어나면 상담 목록/메시지 전송/첨부로 나눌 것
 - [ ] `frontend/src/CitationCards.tsx`는 분리 작업에서 옮기지 않았음(`components/`로 옮길지 결정)
 - [ ] 루트 `test_didim.py`를 `backend/tests/`의 pytest로 병합 (지금은 수정하지 않고 `check.py`가 호출만 함)
-- [ ] `SESSION_SECRET`은 설정만 있고 코드에서 쓰이지 않음 — 제거하거나 용도를 정할 것
 
 ## 아직 검증하지 못한 것
 
