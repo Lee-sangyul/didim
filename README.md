@@ -190,7 +190,7 @@ python scripts/check.py -v               # 통과 항목의 상세도 출력
 | --- | --- |
 | `env` | 파이썬·Node·의존성·Postgres 바이너리 확인 |
 | `legal` | `articles.json` → `legal.db` 복원, 수집 대상 법령 누락, 검색 스모크 |
-| `unit` / `legacy` | `pytest backend`, 기존 `test_didim.py`(수정하지 않고 호출만) |
+| `unit` | `pytest backend` — 단위 테스트와 API 회귀 테스트(인증·상담·채팅·첨부·권한). `tests/conftest.py`가 임시 DB·데모 모드로 격리 |
 | `migrate` | 임시 Postgres에 `alembic upgrade head` → 모델 일치 → 되돌리기·재적용 |
 | `e2e` | 로그인→상담→채팅→첨부→타인 차단→삭제→로그아웃 (SQLite+외래키 강제, Postgres 각각) |
 | `server` | 실제 서버 프로세스를 띄워 HTTP로 로그인·채팅 |

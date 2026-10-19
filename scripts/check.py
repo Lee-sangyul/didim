@@ -51,7 +51,6 @@ STAGES = [
     ("env", "환경"),
     ("legal", "법령 데이터 복원·검색"),
     ("unit", "백엔드 단위 테스트(pytest)"),
-    ("legacy", "기존 API 테스트(test_didim.py)"),
     ("migrate", "DB 마이그레이션"),
     ("e2e", "API 시나리오(E2E)"),
     ("server", "서버 프로세스 기동 스모크"),
@@ -177,18 +176,12 @@ def stage_legal(ctx: Ctx) -> list[Result]:
 
 
 def stage_unit(ctx: Ctx) -> list[Result]:
+    # backend/tests 전체: 단위 테스트 + API 회귀 테스트(test_api.py). 환경은 tests/conftest.py가 격리한다.
     code, out = run([python_exe(), "-m", "pytest", "-q", "-p", "no:cacheprovider"], BACKEND, ctx.env(), timeout=600)
     passed, failed = _count(out, r"(\d+) passed"), _count(out, r"(\d+) failed")
     err = _count(out, r"(\d+) error")
     ok = code == 0
     return [Result("pytest backend", PASS if ok else FAIL, f"통과 {passed}, 실패 {failed}, 오류 {err}" + ("" if ok else "\n" + tail(out, 25)))]
-
-
-def stage_legacy(ctx: Ctx) -> list[Result]:
-    # 기존 테스트는 수정하지 않고 호출만 한다.
-    code, out = run([python_exe(), "test_didim.py"], ROOT, ctx.env(), timeout=600)
-    ran = _count(out, r"Ran (\d+) tests?")
-    return [Result("test_didim.py", PASS if code == 0 else FAIL, f"{ran}개 실행" + ("" if code == 0 else "\n" + tail(out, 25)))]
 
 
 def _alembic(env: dict[str, str], *args: str) -> tuple[int, str]:
@@ -279,7 +272,7 @@ def _server(ctx: Ctx, env: dict[str, str], name: str):
 
 
 def _seed_user(env: dict[str, str], username: str, password: str) -> tuple[int, str]:
-    """서버가 만든 스키마에 점검용 계정을 직접 넣는다 (가입 승인 흐름은 test_didim.py가 담당)."""
+    """서버가 만든 스키마에 점검용 계정을 직접 넣는다 (가입 승인 흐름은 backend/tests의 pytest가 담당)."""
     seed = (
         "import sys;from sqlmodel import Session;from app.database import engine;"
         "from app.models import User;from app.security.password import hash_password;"
@@ -608,7 +601,7 @@ def stage_regress(ctx: Ctx) -> list[Result]:
 
 
 RUNNERS = {
-    "env": stage_env, "legal": stage_legal, "unit": stage_unit, "legacy": stage_legacy,
+    "env": stage_env, "legal": stage_legal, "unit": stage_unit,
     "migrate": stage_migrate, "e2e": stage_e2e, "server": stage_server,
     "frontend": stage_frontend, "browser": stage_browser,
     "release": stage_release, "regress": stage_regress,
@@ -637,8 +630,8 @@ def main() -> int:
         print(f"알 수 없는 단계: {unknown}. --list 로 확인하세요.", file=sys.stderr)
         return 2
     chosen = [n for n in chosen if n not in args.skip]
-    # unit/regress/legacy는 복원된 법령 DB가 필요하므로 legal을 앞에 둔다
-    if any(n in chosen for n in ("unit", "regress", "legacy")) and "legal" not in chosen:
+    # unit/regress는 복원된 법령 DB가 필요하므로 legal을 앞에 둔다
+    if any(n in chosen for n in ("unit", "regress")) and "legal" not in chosen:
         chosen.insert(0, "legal")
 
     tmp = Path(tempfile.mkdtemp(prefix="didim-check-"))
