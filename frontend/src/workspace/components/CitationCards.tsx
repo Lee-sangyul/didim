@@ -1,4 +1,5 @@
-import type { Citation } from "./types";
+// 근거 조문 카드: 조문 원문(DB 값)과 선택 이유, 출처 링크를 접이식으로 보여 준다. ResultPanel이 사용한다.
+import type { Citation } from "../../types";
 
 export default function CitationCards({
   citations,

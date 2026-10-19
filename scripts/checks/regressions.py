@@ -229,7 +229,7 @@ def r014_external_call_guard_targets_exist():
     from app.services import chat_service
 
     has = hasattr(chat_service, "Anthropic") and hasattr(chat_service, "find_citations")
-    patched = "chat_service" in _read(ROOT / "test_didim.py")
+    patched = "chat_service" in _read(BACKEND / "tests" / "test_api.py")
     return has and patched, f"chat_service 심볼={has}, 테스트가 chat_service 패치={patched}"
 
 

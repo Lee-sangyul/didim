@@ -20,7 +20,7 @@
 | LLM이 생성한 **조문 텍스트**를 사용자에게 보여주기 | 근거 조문은 반드시 DB(`articles.json`에서 온 공식 원문)에서 꺼내 붙인다. LLM은 `article_id`만 고른다 |
 | "이 사례에는 이 조문이 해당된다"는 **법률 판단**을 코드·테스트·데이터에 넣기 | `backend/tests/legal/eval_cases.json`의 `expected_articles`는 사람이 지정한다 |
 | 서버 요청 처리 중 법제처 API 호출 | 법령 수집은 수동 스크립트(`python -m app.legal.ingest`)만 한다 |
-| 테스트에서 Claude·법제처·Supabase 실제 호출 | 비용·키 노출·비결정성. 실호출은 `@pytest.mark.live`로 분리돼 있고 기본 제외다 |
+| 테스트에서 Claude·법제처·Supabase 실제 호출, 테스트가 `.env`의 DB를 쓰게 만들기 | 비용·키 노출·운영 데이터 손상. `backend/tests/conftest.py`가 환경을 격리하니 **그 설정을 약화시키지 않는다**. 실호출은 `@pytest.mark.live`로 분리돼 있고 기본 제외다 |
 | 이미 적용된 마이그레이션 파일 수정 | 운영 DB와 이력이 어긋난다. 새 revision을 추가한다 |
 | 의존성 버전 변경 (`requirements.txt`, `package.json`) | 먼저 사람에게 보고한다. 특히 `sqlmodel`/`pydantic` 조합은 호환 문제가 있었다 |
 | 점검을 통과시키려고 점검·테스트를 약화시키기 | 허용 목록(`UNSTYLED_OK`)에 추가, `regressions.json`의 `status`를 임의로 바꾸기, 테스트 삭제·skip 금지 |
@@ -86,7 +86,7 @@ backend/app/
   services/login_guard.py, retention.py   로그인 시도 제한 / 증빙 문서 보관·삭제
   models.py          메인 DB 모델
 backend/migrations/  alembic (Postgres 전용)
-backend/tests/       pytest. 외부 호출 없음
+backend/tests/       pytest. conftest.py가 .env와 무관한 격리 환경(임시 SQLite·데모 모드·키 비움)을 강제한다. API 회귀는 test_api.py
 frontend/src/        React + TypeScript (Vite)
   App.tsx            로그인 상태 확인 → 로그인 화면 또는 상담 화면 분기만
   workspace/         상담 화면 (구조는 아래 "프런트엔드 구조" 참고)
@@ -95,7 +95,6 @@ data/legal/          articles.json(커밋), legal.db(생성물, 미커밋), raw/
 json/                위험도 평가 프롬프트 설정(program_config.json 등)
 scripts/             check.py(릴리스 점검), regressions.json(결함 목록)
 TODO.md              사람의 결정·확인을 기다리는 일 (작업 전에 읽는다)
-test_didim.py        기존 API 테스트(수정하지 말고 호출만; 추후 병합 예정)
 ```
 
 실행: `start.sh` / `start.bat` / `start.ps1`. 백엔드 `:8000`, 프런트(Vite) `:5173`이 `/api`를 8000으로 프록시한다.
@@ -115,7 +114,7 @@ hooks/
   useBookmarks.ts     북마크(브라우저 저장)
   usePanelResize.ts   좌우 패널 너비 조절
 components/           화면 조각. 받은 props만 그린다
-  TitleBar, CaseRail, ChatHeader, MessageThread → MessageItem, Composer, ResultPanel, PrintReport
+  TitleBar, CaseRail, ChatHeader, MessageThread → MessageItem, Composer, ResultPanel → CitationCards, PrintReport
 ```
 
 | 새로 만들 것 | 둘 곳 |

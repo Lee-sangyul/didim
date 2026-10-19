@@ -67,7 +67,6 @@ class Settings:
     upload_dir: Path
     max_upload_bytes: int
 
-    session_secret: str
     cookie_secure: bool
 
     supabase_url: str
@@ -153,10 +152,6 @@ def load_settings() -> Settings:
             max_upload_mb
             * 1024
             * 1024
-        ),
-        session_secret=env_str(
-            "SESSION_SECRET",
-            "",
         ),
         cookie_secure=read_bool(
             "COOKIE_SECURE",

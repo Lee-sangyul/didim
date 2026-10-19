@@ -177,9 +177,9 @@
       "severity": "minor",
       "symptom": "리팩터링으로 Anthropic/find_citations 위치가 바뀌어도 테스트는 통과하지만 외부 호출을 막지 못함",
       "root_cause": "patch.object 대상이 옛 모듈(app.main)이면 새 모듈의 실제 호출은 막히지 않음",
-      "fix": "test_didim.py가 app.services.chat_service를 패치. 대상 속성이 실제로 존재하고 chat_service가 이를 사용하는지 확인",
+      "fix": "backend/tests/test_api.py가 app.services.chat_service를 패치. 대상 속성이 실제로 존재하고 chat_service가 이를 사용하는지 확인",
       "check": "r014_external_call_guard_targets_exist",
-      "refs": "95de0f9, test_didim.py"
+      "refs": "95de0f9, backend/tests/test_api.py"
     },
     {
       "id": "R015",
