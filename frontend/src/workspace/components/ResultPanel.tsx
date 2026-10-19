@@ -2,8 +2,8 @@
 import type { HTMLAttributes, RefObject } from "react";
 
 import { attachmentDownloadUrl } from "../../api";
-import CitationCards from "../../CitationCards";
 import type { Assessment, Attachment } from "../../types";
+import CitationCards from "./CitationCards";
 import { DEFAULT_ASIDE_WIDTH, riskLabel } from "../constants";
 import { formatBytes } from "../format";
 

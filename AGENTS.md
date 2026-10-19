@@ -115,7 +115,7 @@ hooks/
   useBookmarks.ts     북마크(브라우저 저장)
   usePanelResize.ts   좌우 패널 너비 조절
 components/           화면 조각. 받은 props만 그린다
-  TitleBar, CaseRail, ChatHeader, MessageThread → MessageItem, Composer, ResultPanel, PrintReport
+  TitleBar, CaseRail, ChatHeader, MessageThread → MessageItem, Composer, ResultPanel → CitationCards, PrintReport
 ```
 
 | 새로 만들 것 | 둘 곳 |
