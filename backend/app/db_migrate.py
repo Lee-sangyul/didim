@@ -19,6 +19,7 @@ from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import DBAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,52 @@ def schema_state(engine: Engine) -> dict[str, Any]:
         status = "unmanaged"  # 테이블은 있는데 alembic 이력이 없다 (마이그레이션 없이 만든 DB)
 
     return {"status": status, "current": current, "head": head}
+
+
+# 코드가 기대하는 테이블·컬럼이 DB에 없을 때 Postgres가 돌려주는 오류 코드 (undefined_table, undefined_column)
+SCHEMA_ERROR_SQLSTATES = {"42P01", "42703"}
+
+OUTDATED_MESSAGE = (
+    "서버 데이터베이스가 최신 버전이 아니라 이 요청을 처리할 수 없습니다. "
+    "관리자에게 DB 업데이트(마이그레이션)를 요청해 주세요."
+)
+
+
+def live_state(engine: Engine) -> dict[str, Any]:
+    """지금 이 순간의 DB 스키마 상태. 서버 시작 때의 값이 아니라 매번 DB에서 다시 읽는다.
+
+    마이그레이션을 서버가 떠 있는 동안 적용해도 재시작 없이 `ready`로 바뀐다.
+    """
+    try:
+        return schema_state(engine)
+    except Exception as exc:
+        return {"status": "error", "error": type(exc).__name__, "current": None, "head": None}
+
+
+def is_schema_mismatch(exc: BaseException) -> bool:
+    """예외(또는 그 원인)가 '없는 테이블/컬럼을 조회했다'는 DB 오류인가."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+
+        if isinstance(current, DBAPIError):
+            sqlstate = getattr(current.orig, "sqlstate", None) or getattr(current.orig, "pgcode", None)
+            if sqlstate in SCHEMA_ERROR_SQLSTATES:
+                return True
+
+        current = current.__cause__ or current.__context__
+
+    return False
+
+
+def outdated_by(exc: BaseException, engine: Engine) -> bool:
+    """이 오류의 원인이 'DB가 코드보다 뒤처져 있기 때문'이라고 확신할 수 있는가.
+
+    스키마 불일치 오류이면서 지금 DB가 실제로 최신이 아닐 때만 True. (그 외의 같은 코드 오류는 일반 오류로 둔다)
+    """
+    return is_schema_mismatch(exc) and live_state(engine)["status"] != "ready"
 
 
 def upgrade_head(engine: Engine | None = None) -> None:

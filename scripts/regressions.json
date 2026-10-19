@@ -195,15 +195,15 @@
     },
     {
       "id": "R016",
-      "title": "모델 컬럼 추가 후 운영 DB에 마이그레이션이 적용되기 전에 코드를 배포하면 조회가 깨짐",
+      "title": "코드가 마이그레이션보다 먼저 배포되면(DB가 뒤처지면) 요청이 설명 없이 500으로 실패",
       "area": "release",
-      "status": "open",
+      "status": "fixed",
       "severity": "major",
-      "symptom": "새 코드가 message.versions 등 새 컬럼을 조회하는 순간 운영 DB(Postgres)에 컬럼이 없어 오류(R003과 같은 유형)",
-      "root_cause": "마이그레이션 적용과 코드 배포가 분리돼 있고 순서를 강제하는 장치가 없음",
-      "fix": "경고·상태 확인은 구현됨: 서버 시작 시 DB가 뒤처졌으면 로그에 오류로 알리고 /api/health/db가 outdated를 돌려주며 `python -m scripts.migrate`로 확인·적용한다. 아직 정해지지 않은 것: 뒤처진 DB에서 기동을 거부할지, 운영 배포 절차에 마이그레이션 단계를 고정할지(TODO.md)",
-      "check": null,
-      "refs": "R003, backend/migrations/versions/c4d5e6f7a8b9_add_message_versions.py"
+      "symptom": "새 코드가 새 테이블·컬럼을 조회하는데 운영 DB에 아직 없으면 해당 요청이 `500 Internal Server Error`(채팅은 \"API 키를 확인하세요\")로만 보이고, 원인은 서버 로그에만 있었다. 마이그레이션을 나중에 적용해도 상태 표시(/api/health/db)는 재시작 전까지 outdated로 남았다",
+      "root_cause": "마이그레이션 적용과 코드 배포가 분리돼 있어 순서를 사람이 기억해야 하고, 어긋났을 때의 실패 방식이 불명확했다",
+      "fix": "결정(2026-10): 뒤처진 DB에서도 서버는 기동한다. 대신 (1) 없는 테이블·컬럼 오류를 503 {code: db_outdated}와 조치 안내로 바꾸고(backend/app/db_errors.py) (2) 채팅 오류 문구를 바로잡고 (3) /api/health/db를 매번 DB에서 읽어 재시작 없이 복구를 반영하며 (4) 로그에 해결 명령을 남긴다. 순서 위반 자체를 막지는 못한다 — 배포 절차(README \"배포 순서\")와 `python -m scripts.migrate`(읽기 전용 확인)로 관리한다",
+      "check": "r016_outdated_db_fails_clearly_and_recovers",
+      "refs": "backend/app/db_errors.py, backend/app/db_migrate.py, backend/app/main.py, scripts/check.py server 단계"
     },
     {
       "id": "R017",

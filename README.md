@@ -107,6 +107,17 @@ cd backend
 
 Windows에서는 위 명령의 Python 경로를 `..\.venv\Scripts\python.exe`로 바꾸세요. `python -m alembic upgrade head`(`backend/`에서)도 같은 일을 합니다. 운영 DB 연결 정보는 `.env`에만 보관하세요.
 
+#### 배포 순서 (운영 DB를 바꾸는 변경이 있을 때)
+
+**마이그레이션을 먼저, 새 코드는 그다음**에 올립니다.
+
+1. `cd backend && python -m scripts.migrate` — 읽기 전용 확인(최신이면 종료 코드 0, 뒤처졌으면 1)
+2. `python -m scripts.migrate --upgrade` — 적용 (**운영 DB가 바뀝니다**)
+3. 새 코드 배포
+4. `GET /api/health/db`가 `"status": "ready"`인지 확인
+
+순서가 어긋나 **코드가 먼저 올라가도 서버는 기동합니다.** 이때 새 테이블·컬럼을 쓰는 요청만 `503`(`{"code": "db_outdated"}`)과 "관리자에게 DB 업데이트를 요청해 주세요"라는 안내로 실패하고, 서버 로그에 해결 명령이 남습니다. 마이그레이션을 적용하면 **서버를 재시작하지 않아도** 바로 복구됩니다.
+
 ## Claude 및 법령 검색
 
 데모 모드는 외부 AI 호출 없이 동작합니다. Claude를 사용하려면 `.env`에 다음 값을 넣고 서버를 재시작합니다.

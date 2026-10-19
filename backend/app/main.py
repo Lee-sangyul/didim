@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import DBAPIError
 
 from .config import settings
-from .db_migrate import ensure_schema
+from .db_errors import outdated_db_response
+from .db_migrate import ensure_schema, live_state
 from .legal.bootstrap import ensure_legal_db
 from .database import engine, init_sqlite_schema  # noqa: F401  (engine: 테스트가 사용)
 from .routers import auth_router
@@ -33,6 +36,18 @@ app.include_router(admin_registration_router)
 app.include_router(cases_router)
 app.include_router(attachments_router)
 app.include_router(chat_router)
+
+
+@app.exception_handler(DBAPIError)
+async def handle_db_error(request: Request, exc: DBAPIError):
+    """DB가 뒤처져서 난 오류만 503으로 바꾼다. 그 밖의 DB 오류는 기존처럼 500으로 둔다."""
+    if not settings.is_sqlite:
+        response = await run_in_threadpool(outdated_db_response, exc, engine)
+
+        if response is not None:
+            return response
+
+    raise exc
 
 
 @app.on_event("startup")
@@ -70,8 +85,19 @@ def health() -> dict:
 
 @app.get("/api/health/db")
 def health_db() -> dict:
-    """DB 스키마 상태: sqlite | ready | outdated | unmanaged | error. (접속 정보는 포함하지 않는다)"""
-    return getattr(app.state, "db", None) or {"status": "unknown"}
+    """DB 스키마 상태: sqlite | ready | outdated | unmanaged | error. (접속 정보는 포함하지 않는다)
+
+    매번 DB에서 다시 읽으므로 마이그레이션을 적용하면 재시작 없이 바로 반영된다.
+    """
+    if settings.is_sqlite:
+        return {"status": "sqlite"}
+
+    state = live_state(engine)
+
+    if getattr(app.state, "db", {}).get("migrated"):
+        state["migrated"] = True  # 이 서버가 시작할 때 빈 DB를 처음 만들었다
+
+    return state
 
 
 @app.get("/api/health/legal")

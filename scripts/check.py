@@ -341,6 +341,28 @@ def stage_server(ctx: Ctx) -> list[Result]:
         ))
         code, _ = _http(opener, "POST", f"{base}/api/auth/login", {"username": "nobody", "password": "wrong-password"})
         r.append(Result("빈 Postgres 첫 기동 직후 로그인 요청이 500이 아님(401)", PASS if code == 401 else FAIL, f"{code}"))
+
+        # 서버가 떠 있는 동안 DB가 코드보다 뒤처지는 상황(배포 순서 위반, R016).
+        # 정책: 기동은 계속되고, 영향받는 요청만 설명 있는 503으로 실패하며, 마이그레이션 적용 시 재시작 없이 복구된다.
+        code, out = _alembic(pg_env, "downgrade", "c4d5e6f7a8b9")
+        r.append(Result("DB를 두 단계 되돌려 '코드가 먼저 배포된' 상황을 만듦", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 6)))
+        if code == 0:
+            code, body = _http(opener, "POST", f"{base}/api/auth/login", {"username": "nobody", "password": "wrong-password"})
+            r.append(Result(
+                "뒤처진 DB: 로그인 요청이 설명 있는 503(db_outdated)",
+                PASS if code == 503 and '"db_outdated"' in body and "마이그레이션" in body else FAIL, f"{code} {body[:100]}",
+            ))
+            code, body = _http(opener, "GET", f"{base}/api/health/db")
+            r.append(Result("뒤처진 DB: /api/health/db가 outdated", PASS if code == 200 and '"outdated"' in body else FAIL, f"{code} {body[:100]}"))
+            code, _ = _http(opener, "GET", f"{base}/api/health")
+            r.append(Result("뒤처진 DB에서도 서버는 계속 동작(/api/health 200)", PASS if code == 200 else FAIL, f"{code}"))
+
+            code, out = _alembic(pg_env, "upgrade", "head")
+            r.append(Result("마이그레이션 적용(서버는 그대로 실행 중)", PASS if code == 0 else FAIL, "" if code == 0 else tail(out, 6)))
+            code, body = _http(opener, "GET", f"{base}/api/health/db")
+            r.append(Result("재시작 없이 /api/health/db가 ready로 복구", PASS if code == 200 and '"ready"' in body else FAIL, f"{code} {body[:100]}"))
+            code, _ = _http(opener, "POST", f"{base}/api/auth/login", {"username": "nobody", "password": "wrong-password"})
+            r.append(Result("재시작 없이 로그인 요청이 정상 처리(401)", PASS if code == 401 else FAIL, f"{code}"))
     return r
 
 
@@ -561,7 +583,9 @@ def stage_regress(ctx: Ctx) -> list[Result]:
     extra: dict[str, str] = {}
     pg = ctx.postgres()
     if pg is not None:
-        extra["CHECK_PG_FRESH_URL"] = pg.create_db("regress_fresh")
+        # 점검마다 서로 다른 DB를 쓴다(앞선 점검이 남긴 상태가 다음 점검의 전제를 깨지 않게)
+        extra["CHECK_PG_FRESH_URL"] = pg.create_db("regress_fresh")  # R020: 빈 DB에서 시작
+        extra["CHECK_PG_OUTDATED_URL"] = pg.create_db("regress_outdated")  # R016: 뒤처진 DB 만들기
     raw = run_worker("regress", ctx.env(**extra))
     out: list[Result] = []
     for item in raw:
