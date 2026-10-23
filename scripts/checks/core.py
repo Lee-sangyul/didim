@@ -61,6 +61,7 @@ def isolated_env(tmp: Path, **extra: str) -> dict[str, str]:
         SUPABASE_URL="",
         SUPABASE_SECRET_KEY="",
         COOKIE_SECURE="false",
+        LOGIN_RATE_LIMIT_ENABLED="true",  # 기본은 꺼짐(데모용)이지만 기능 자체는 계속 점검한다
         DATABASE_URL=f"sqlite:///{(tmp / 'check.db').as_posix()}",
         UPLOAD_DIR=str(tmp / "uploads"),
         LEGAL_DATA_DIR=str(tmp / "legal"),

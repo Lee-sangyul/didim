@@ -359,9 +359,9 @@ def stage_server(ctx: Ctx) -> list[Result]:
     return r
 
 
-def _build_frontend(ctx: Ctx, dist: Path) -> tuple[int, str]:
+def _build_frontend(ctx: Ctx, dist: Path, **extra_env: str) -> tuple[int, str]:
     npx = shutil.which("npx") or "npx"
-    return run([npx, "--no-install", "vite", "build", "--outDir", str(dist), "--emptyOutDir"], FRONTEND, ctx.env(), timeout=300)
+    return run([npx, "--no-install", "vite", "build", "--outDir", str(dist), "--emptyOutDir"], FRONTEND, ctx.env(**extra_env), timeout=300)
 
 
 def stage_frontend(ctx: Ctx) -> list[Result]:
@@ -412,11 +412,11 @@ def stage_browser(ctx: Ctx) -> list[Result]:
     if code != 0:
         return [Result("Playwright 설치", WARN, "설치되지 않아 브라우저 E2E를 건너뜀: pip install -r backend/requirements-dev.txt")]
 
-    dist = ctx.tmp / "dist"
-    if not (dist / "index.html").exists():  # frontend 단계를 건너뛴 경우
-        code, out = _build_frontend(ctx, dist)
-        if code != 0:
-            return [Result("브라우저 E2E용 프런트 빌드", FAIL, tail(out, 12))]
+    # 로그인 잠금 화면이 켜진 별도 빌드를 쓴다 (배포용 기본 빌드는 꺼져 있다)
+    dist = ctx.tmp / "dist-browser"
+    code, out = _build_frontend(ctx, dist, VITE_LOGIN_GUARD="true")
+    if code != 0:
+        return [Result("브라우저 E2E용 프런트 빌드", FAIL, tail(out, 12))]
 
     env = ctx.env(
         DATABASE_URL=f"sqlite:///{(ctx.tmp / 'browser.db').as_posix()}",
@@ -558,6 +558,14 @@ def stage_release(ctx: Ctx) -> list[Result]:
             risky.append("DATABASE_URL(프로젝트 식별자)")
     risky = sorted(set(risky))
     r.append(Result(".env.example에 실제 값 형태의 자격 정보 없음", PASS if not risky else WARN, f"확인 필요한 키: {risky}" if risky else ""))
+
+    cfg = (BACKEND / "app" / "config.py").read_text("utf-8")
+    m = re.search(r'"LOGIN_RATE_LIMIT_ENABLED",\s*(True|False)', cfg)
+    off = not m or m.group(1) == "False"
+    r.append(Result(
+        "로그인 시도 제한이 기본으로 켜져 있음", WARN if off else PASS,
+        "꺼져 있음(데모용, 2026-10). 운영 공개 전에 .env의 LOGIN_RATE_LIMIT_ENABLED=true, 프런트는 VITE_LOGIN_GUARD=true로 빌드 (TODO.md)" if off else "",
+    ))
 
     pkg = json.loads((FRONTEND / "package.json").read_text("utf-8"))
     floating = sorted(k for k, v in {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}.items() if v in ("latest", "*"))

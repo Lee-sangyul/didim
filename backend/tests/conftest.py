@@ -32,6 +32,7 @@ os.environ.update(
     SUPABASE_URL="",
     SUPABASE_SECRET_KEY="",
     COOKIE_SECURE="false",
+    LOGIN_RATE_LIMIT_ENABLED="true",  # 운영 기본값은 꺼짐(데모용)이지만 기능 코드는 계속 테스트한다
     MAX_UPLOAD_MB="1",  # 용량 초과 테스트를 빠르게 하려고 1MB로 둔다
     LEGAL_CITATIONS_ENABLED="false",
 )

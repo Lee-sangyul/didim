@@ -8,6 +8,10 @@
  * 아래 두 값은 서버의 MAX_FAILURES_PER_USER, WINDOW_MINUTES와 같아야 한다
  * (scripts/checks/regressions.py R019가 점검한다).
  */
+// 이 장치는 빌드 시 VITE_LOGIN_GUARD=true일 때만 동작한다. 기본은 꺼짐(데모 시연 중 잠금 방지, 2026-10).
+// 서버의 LOGIN_RATE_LIMIT_ENABLED와 같은 상태로 맞춘다.
+export const LOGIN_GUARD_ENABLED = import.meta.env.VITE_LOGIN_GUARD === "true";
+
 export const MAX_FAILURES = 5;
 export const WINDOW_MINUTES = 15;
 
@@ -57,6 +61,7 @@ function prune(state: GuardState, now: number): void {
 
 /** 잠금이 풀릴 때까지 남은 밀리초. 잠겨 있지 않으면 0. */
 export function lockRemainingMs(username: string, now = Date.now()): number {
+  if (!LOGIN_GUARD_ENABLED) return 0;
   const state = load();
   prune(state, now);
   return Math.max(0, (state.locks[key(username)] ?? 0) - now);
@@ -71,6 +76,7 @@ export function attemptsLeft(username: string, now = Date.now()): number {
 
 /** 서버가 401을 돌려줬을 때 호출한다. 한도에 도달하면 잠금 해제 시각을 정한다. */
 export function recordFailure(username: string, now = Date.now()): { left: number; lockedMs: number } {
+  if (!LOGIN_GUARD_ENABLED) return { left: 0, lockedMs: 0 };
   const state = load();
   prune(state, now);
   const name = key(username);
@@ -90,6 +96,7 @@ export function recordFailure(username: string, now = Date.now()): { left: numbe
 
 /** 서버가 429(잠금)를 돌려줬을 때 호출한다. */
 export function recordServerLock(username: string, retryAfterSeconds: number, now = Date.now()): void {
+  if (!LOGIN_GUARD_ENABLED) return;
   const state = load();
   prune(state, now);
   state.locks[key(username)] = now + retryAfterSeconds * 1000;

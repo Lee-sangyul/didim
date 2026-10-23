@@ -257,7 +257,11 @@ def r017_registration_documents_get_deleted():
 
 
 def r018_login_rate_limited():
-    """실제 동작: 같은 아이디로 반복 실패하면 429, 잠긴 동안은 올바른 비밀번호도 거부."""
+    """기본 설정에서 제한이 켜져 있는가(꺼져 있으면 KNOWN). 기능 코드의 정상 동작은 e2e/browser 단계가 켠 상태로 따로 검증한다."""
+    # 점검 환경은 기능 검증을 위해 스위치를 켜 두므로, 환경이 아니라 코드의 기본값을 본다
+    m = re.search(r'"LOGIN_RATE_LIMIT_ENABLED",\s*(True|False)', _read(BACKEND / "app" / "config.py"))
+    if not m or m.group(1) == "False":
+        return False, "기본값이 꺼져 있음(데모용)"
     import uuid
 
     from fastapi.testclient import TestClient

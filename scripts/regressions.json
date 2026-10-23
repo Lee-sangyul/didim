@@ -219,15 +219,15 @@
     },
     {
       "id": "R018",
-      "title": "로그인 시도 횟수 제한이 없음",
+      "title": "로그인 시도 횟수 제한이 현재 꺼져 있음(데모 시연용 임시 조치)",
       "area": "security",
-      "status": "fixed",
+      "status": "open",
       "severity": "major",
-      "symptom": "비밀번호 무차별 대입을 막는 장치가 없음(상담 내용·교원 개인정보 접근 계정)",
+      "symptom": "무차별 대입 방지가 비활성이다. 구현은 남아 있고 스위치만 꺼 둠",
       "root_cause": "로그인 엔드포인트에 시도 제한·잠금·지연이 구현되지 않음",
-      "fix": "DB 기반 로그인 시도 제한(backend/app/services/login_guard.py): 아이디 5회/15분, IP 20회/15분. 잠기면 429와 Retry-After. 브라우저도 같은 한도를 미리 적용(frontend/src/loginGuard.ts)",
+      "fix": "재활성화: .env에 LOGIN_RATE_LIMIT_ENABLED=true, 프런트는 VITE_LOGIN_GUARD=true로 빌드한 dist 커밋. 기본값을 true로 되돌리려면 config.py의 read_bool 기본값과 loginGuard.ts를 바꾼다. 점검(release 단계)이 꺼진 상태를 WARN으로 알린다",
       "check": "r018_login_rate_limited",
-      "refs": "backend/app/routers/auth.py, backend/app/services/login_guard.py, frontend/src/loginGuard.ts, frontend/src/LoginPage.tsx"
+      "refs": "backend/app/config.py, backend/app/routers/auth.py, frontend/src/loginGuard.ts, TODO.md"
     },
     {
       "id": "R019",
