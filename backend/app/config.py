@@ -77,6 +77,7 @@ class Settings:
 
     law_api_oc: str
     legal_citations_enabled: bool
+    login_rate_limit_enabled: bool
 
     @property
     def is_sqlite(self) -> bool:
@@ -177,6 +178,11 @@ def load_settings() -> Settings:
         law_api_oc=env_str(
             "LAW_API_OC",
             "",
+        ),
+        # 로그인 무차별 대입 방지. 데모 시연 중 잠금을 막으려고 기본은 꺼 둔다(2026-10). 운영 공개 전에 true로 켤 것.
+        login_rate_limit_enabled=read_bool(
+            "LOGIN_RATE_LIMIT_ENABLED",
+            False,
         ),
         legal_citations_enabled=read_bool(
             "LEGAL_CITATIONS_ENABLED",

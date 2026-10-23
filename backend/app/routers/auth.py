@@ -115,10 +115,13 @@ def login(
     username = normalize_username(payload.username)
     ip = request.client.host if request.client else "unknown"
 
-    state = login_guard.check(session, username, ip)
+    guard_on = settings.login_rate_limit_enabled  # 꺼져 있으면 시도 횟수를 세지도 막지도 않는다
 
-    if state.locked:
-        return _locked_response(state.retry_after)  # type: ignore[return-value]
+    if guard_on:
+        state = login_guard.check(session, username, ip)
+
+        if state.locked:
+            return _locked_response(state.retry_after)  # type: ignore[return-value]
 
     user = authenticate_user(
         session=session,
@@ -127,18 +130,24 @@ def login(
     )
 
     if user is None:
-        state = login_guard.record_failure(session, username, ip)
+        headers = {}
 
-        if state.locked:
-            return _locked_response(state.retry_after)  # type: ignore[return-value]
+        if guard_on:
+            state = login_guard.record_failure(session, username, ip)
+
+            if state.locked:
+                return _locked_response(state.retry_after)  # type: ignore[return-value]
+
+            headers["X-Remaining-Attempts"] = str(state.remaining)
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="아이디 또는 비밀번호가 올바르지 않습니다.",
-            headers={"X-Remaining-Attempts": str(state.remaining)},
+            headers=headers or None,
         )
 
-    login_guard.clear_user(session, username)
+    if guard_on:
+        login_guard.clear_user(session, username)
 
     session_token = create_auth_session(
         session=session,
